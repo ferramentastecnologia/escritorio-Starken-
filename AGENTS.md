@@ -15,6 +15,7 @@ Do not use files opened from `file:///Users/...` or local Mac copies as the sour
 Before any code change on the VPS:
 - SSH into `root@187.77.46.199` and work in `/var/www/starken-os`.
 - Run `git status --short` and understand any existing user changes.
+- Use `git status --short --untracked-files=no` for the canonical clean check; the VPS contains legacy/untracked operational files outside the tracked live source.
 - Create a safety point with `starken-os-backup` or `starken-os-checkpoint "message"` when the change touches live behavior.
 - Keep edits surgical. Do not overwrite whole live files from a Mac copy unless explicitly requested and verified against the VPS state.
 
