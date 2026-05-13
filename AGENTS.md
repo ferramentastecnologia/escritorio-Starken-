@@ -3,8 +3,34 @@
 ## Overview
 **Starken OS** is a unified SPA built in a single HTML file (`checklist-relatorios.html`) with no framework.
 - **Repo**: `ferramentastecnologia/starken-os`
-- **Live**: `starken-os.vercel.app`
-- **Branch**: `main`
+- **Live**: `https://escritorio.starkentecnologia.com.br/starken-os/`
+- **Source of truth**: VPS path `/var/www/starken-os`
+- **Branch**: local VPS Git history
+
+## Mandatory VPS Workflow
+This project is operated from the VPS. When working on the live office app, agents must treat `/var/www/starken-os` on `root@187.77.46.199` as the primary source.
+
+Do not use files opened from `file:///Users/...` or local Mac copies as the source of truth. Local Mac files may be used only as temporary scratch copies for diffing, inspection, or safe patch preparation.
+
+Before any code change on the VPS:
+- SSH into `root@187.77.46.199` and work in `/var/www/starken-os`.
+- Run `git status --short` and understand any existing user changes.
+- Create a safety point with `starken-os-backup` or `starken-os-checkpoint "message"` when the change touches live behavior.
+- Keep edits surgical. Do not overwrite whole live files from a Mac copy unless explicitly requested and verified against the VPS state.
+
+After any code change on the VPS:
+- Review the diff with `git diff`.
+- Validate HTML/JS syntax when editing `checklist-relatorios.html`, `index.html`, or API JavaScript.
+- Test through the live URL, not a `file:///Users/...` preview.
+- Use `starken-os-checkpoint "message"` for a safe backup plus commit once the change is validated.
+
+Preferred live files:
+- Main SPA: `/var/www/starken-os/checklist-relatorios.html`
+- Mirror entry: `/var/www/starken-os/index.html`
+- Content API: `/var/www/starken-os/api/content.js`
+- Meta publishing API: `/var/www/starken-os/api/meta/publish.js`
+
+Never commit or print secrets from `.env`, `.mcp.json`, tokens, backup archives, or local credential files.
 
 ## Architecture
 - **SPA in pure HTML/CSS/JS** — single file (~5000+ lines)

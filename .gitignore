@@ -58,3 +58,7 @@ escritorio/logs/
 escritorio/.env.local
 storybook/storybook-static/
 .gitignore.pre-*
+
+# Local MCP configs with credentials
+.mcp.json
+.mcp.local.json

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "starken-os-vps-files": {
+      "command": "ssh",
+      "args": [
+        "root@187.77.46.199",
+        "cd /var/www/starken-os && npx -y @modelcontextprotocol/server-filesystem /var/www/starken-os"
+      ]
+    }
+  }
+}
