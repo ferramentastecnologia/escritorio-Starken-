@@ -11,7 +11,7 @@
 (function() {
   var OFFICE_GAME_PATH = '/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=4';
   window.STARKEN_OFFICE_GAME_PATH = OFFICE_GAME_PATH;
-  window.STARKEN_OS_BUILD = '20260514-1648-cronograma-dashboard-timeline';
+  window.STARKEN_OS_BUILD = '20260514-1702-meta-bi-ad-creatives';
 
   // Se por qualquer cache/clique antigo o Starken OS for carregado dentro do proprio iframe,
   // troca imediatamente para o escritorio real. Isso evita o efeito "menu dentro de menu".
@@ -20244,10 +20244,11 @@ var _metaBiState = {
   clientsData: {}, // { "client-key": { spend, revenue, conversions, campaigns: [...] } }
   allClients: {}, // { "client-key": { name, tenant, ... } }
   dashboardData: null,
-  charts: {},
-  fetchSeq: 0,
-  lastFetchMeta: null
-};
+	  charts: {},
+	  fetchSeq: 0,
+	  lastFetchMeta: null,
+	  creativeCache: {}
+	};
 
 function metaBiInit() {
   // Initialize and load client grid
@@ -20848,10 +20849,13 @@ async function metaBiFetchDashboardData(clientKey, preset) {
       var _badge = metaBiGetCampaignBadge(row.campaign_name || '');
       var visitasMetric = _badge.badge === 'AUDIÊNCIA' ? clicks : landingPageViews;
 
-      return {
-        campaign_name: row.campaign_name || '—',
-        adset_name: row.adset_name || '',
-        ad_name: row.ad_name || '',
+	      return {
+	        campaign_id: row.campaign_id || '',
+	        campaign_name: row.campaign_name || '—',
+	        adset_id: row.adset_id || '',
+	        adset_name: row.adset_name || '',
+	        ad_id: row.ad_id || '',
+	        ad_name: row.ad_name || '',
         spend: spend,
         impressions: impressions,
         reach: reach,
@@ -21023,26 +21027,30 @@ function metaBiGetInterpretation(row, badge) {
   return lines.join('<br>');
 }
 
-function metaBiRenderDashboardCampaigns(data) {
-  var container = document.getElementById('metaBiDashboardCampaigns');
-  var template = _metaBiState.currentTemplate;
+	function metaBiRenderDashboardCampaigns(data) {
+	  var container = document.getElementById('metaBiDashboardCampaigns');
+	  var template = _metaBiState.currentTemplate;
 
   if (!data.length) {
     container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-secondary);font-size:0.85rem">Nenhuma campanha para o período</div>';
     return;
   }
 
-  var html = '';
-  data.forEach(function(row) {
-    var badgeInfo = metaBiGetCampaignBadge(row.campaign_name);
-    var roasColor = row.roas >= 5 ? '#22c55e' : row.roas >= 2 ? '#f59e0b' : row.roas > 0 ? '#ef4444' : 'var(--text-secondary)';
-    var roasText = row.roas > 0 ? row.roas.toFixed(2) + 'x' : '—';
+	  var html = '';
+	  data.forEach(function(row) {
+	    var badgeInfo = metaBiGetCampaignBadge(row.campaign_name);
+	    var roasColor = row.roas >= 5 ? '#22c55e' : row.roas >= 2 ? '#f59e0b' : row.roas > 0 ? '#ef4444' : 'var(--text-secondary)';
+	    var roasText = row.roas > 0 ? row.roas.toFixed(2) + 'x' : '—';
+	    var creativeDomId = 'metaBiCreative_' + metaBiSafeDomId(row.campaign_id || row.campaign_name);
 
-    html += '<div style="padding:18px;background:var(--card);border-radius:10px;box-shadow:var(--shadow);border-left:4px solid ' + badgeInfo.color + '">'
-      + '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px">'
-      + '<div style="flex:1"><div style="font-size:0.9rem;font-weight:700;color:var(--text)">' + row.campaign_name + '</div></div>'
-      + '<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:' + badgeInfo.color + ';color:#fff;padding:4px 10px;border-radius:4px;white-space:nowrap;margin-left:8px">' + badgeInfo.badge + '</span>'
-      + '</div>';
+	    html += '<div style="padding:18px;background:var(--card);border-radius:10px;box-shadow:var(--shadow);border-left:4px solid ' + badgeInfo.color + '">'
+	      + '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px">'
+	      + '<div style="flex:1"><div style="font-size:0.9rem;font-weight:700;color:var(--text)">' + row.campaign_name + '</div></div>'
+	      + '<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:' + badgeInfo.color + ';color:#fff;padding:4px 10px;border-radius:4px;white-space:nowrap;margin-left:8px">' + badgeInfo.badge + '</span>'
+	      + '</div>';
+	    html += '<div id="' + creativeDomId + '" style="min-height:58px;margin:-4px 0 12px;display:flex;align-items:center;gap:8px;overflow-x:auto;color:var(--text-secondary);font-size:0.72rem">'
+	      + '<span class="mso" style="font-size:16px">image_search</span> Buscando criativos dos anúncios...'
+	      + '</div>';
 
     if (template === 'gastronomia') {
       html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;font-size:0.78rem">'
@@ -21089,8 +21097,111 @@ function metaBiRenderDashboardCampaigns(data) {
     html += '</div>';
   });
 
-  container.innerHTML = html;
-}
+	  container.innerHTML = html;
+	  metaBiLoadCampaignCreatives(data);
+	}
+
+	function metaBiSafeDomId(value) {
+	  return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+	}
+
+	function metaBiCreativeUrlFromCreative(creative) {
+	  creative = creative || {};
+	  var spec = creative.object_story_spec || {};
+	  var feed = creative.asset_feed_spec || {};
+	  var candidates = [
+	    creative.thumbnail_url,
+	    creative.image_url,
+	    spec.link_data && spec.link_data.picture,
+	    spec.video_data && (spec.video_data.image_url || spec.video_data.thumbnail_url),
+	    feed.images && feed.images[0] && (feed.images[0].url || feed.images[0].hash),
+	    feed.videos && feed.videos[0] && (feed.videos[0].thumbnail_url || feed.videos[0].image_url)
+	  ];
+	  for (var i = 0; i < candidates.length; i++) {
+	    if (candidates[i] && /^https?:\/\//i.test(String(candidates[i]))) return String(candidates[i]);
+	  }
+	  return '';
+	}
+
+	function metaBiCreativeExtractItems(payload) {
+	  var items = [];
+	  var seen = {};
+	  (payload.adsets || []).forEach(function(adset) {
+	    (adset.ads || []).forEach(function(ad) {
+	      var creative = ad.creative || {};
+	      var url = metaBiCreativeUrlFromCreative(creative);
+	      if (!url || seen[url]) return;
+	      seen[url] = true;
+	      items.push({
+	        url: url,
+	        adName: ad.name || creative.name || 'Anúncio',
+	        status: ad.status || '',
+	        type: creative.video_id ? 'video' : 'image'
+	      });
+	    });
+	  });
+	  return items.slice(0, 8);
+	}
+
+	function metaBiCreativeHtml(items) {
+	  if (!items || !items.length) {
+	    return '<div style="display:flex;align-items:center;gap:6px;color:var(--text-secondary);font-size:0.72rem;padding:8px 0"><span class="mso">hide_image</span> A Meta não retornou imagem dos criativos desta campanha.</div>';
+	  }
+	  var html = '<div style="display:flex;align-items:center;gap:8px;overflow-x:auto;padding-bottom:2px">';
+	  items.forEach(function(item) {
+	    html += '<a href="' + esc(item.url) + '" target="_blank" title="' + esc(item.adName) + '" style="width:54px;height:54px;border-radius:8px;overflow:hidden;flex:0 0 auto;border:1px solid var(--border);background:var(--bg);position:relative;display:block">'
+	      + '<img src="' + esc(item.url) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentElement.innerHTML=\'<span class=&quot;mso&quot; style=&quot;font-size:18px;color:var(--text-secondary)&quot;>broken_image</span>\'">'
+	      + (item.type === 'video' ? '<span class="mso" style="position:absolute;right:3px;bottom:3px;font-size:13px;color:#fff;background:rgba(0,0,0,.55);border-radius:999px;padding:1px">play_circle</span>' : '')
+	      + '</a>';
+	  });
+	  html += '</div>';
+	  return html;
+	}
+
+	async function metaBiLoadCampaignCreatives(rows) {
+	  var clientKey = _metaBiState.currentClient;
+	  var requestSeq = _metaBiState.fetchSeq;
+	  if (!clientKey || !rows || !rows.length) return;
+	  var unique = [];
+	  var seen = {};
+	  rows.forEach(function(row) {
+	    var cid = row.campaign_id || '';
+	    if (!cid || seen[cid]) return;
+	    seen[cid] = true;
+	    unique.push({ id: cid, name: row.campaign_name || cid });
+	  });
+	  if (!unique.length) {
+	    rows.forEach(function(row) {
+	      var el = document.getElementById('metaBiCreative_' + metaBiSafeDomId(row.campaign_id || row.campaign_name));
+	      if (el) el.innerHTML = '<span class="mso" style="font-size:16px">info</span> ID da campanha não retornou para buscar criativos.';
+	    });
+	    return;
+	  }
+	  for (var i = 0; i < unique.length; i++) {
+	    if (requestSeq !== _metaBiState.fetchSeq) return;
+	    var campaign = unique[i];
+	    var domId = 'metaBiCreative_' + metaBiSafeDomId(campaign.id);
+	    var el = document.getElementById(domId);
+	    if (!el) continue;
+	    var cacheKey = clientKey + '|' + campaign.id;
+	    if (_metaBiState.creativeCache[cacheKey]) {
+	      el.innerHTML = metaBiCreativeHtml(_metaBiState.creativeCache[cacheKey]);
+	      continue;
+	    }
+	    try {
+	      var res = await fetch(metaApiBase() + '/api/meta/campaigns?client=' + encodeURIComponent(clientKey) + '&campaign_id=' + encodeURIComponent(campaign.id) + '&deep=true');
+	      var json = await res.json();
+	      if (!res.ok || json.error) throw new Error(json.message || json.error || res.statusText);
+	      var items = metaBiCreativeExtractItems(json);
+	      _metaBiState.creativeCache[cacheKey] = items;
+	      if (requestSeq !== _metaBiState.fetchSeq) return;
+	      el.innerHTML = metaBiCreativeHtml(items);
+	    } catch(e) {
+	      if (requestSeq !== _metaBiState.fetchSeq) return;
+	      el.innerHTML = '<div style="display:flex;align-items:center;gap:6px;color:#f59e0b;font-size:0.72rem;padding:8px 0"><span class="mso">warning</span> Não foi possível buscar criativos desta campanha.</div>';
+	    }
+	  }
+	}
 
 function metaBiGetSistemaKey() {
   return 'metaBiSistema_' + (_metaBiState.currentClient || '') + '_' + (_metaBiState.currentPeriod || '');
