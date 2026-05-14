@@ -11,6 +11,7 @@
 (function() {
   var OFFICE_GAME_PATH = '/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=4';
   window.STARKEN_OFFICE_GAME_PATH = OFFICE_GAME_PATH;
+  window.STARKEN_OS_BUILD = '20260514-0055-schedule-cache-guard';
 
   // Se por qualquer cache/clique antigo o Starken OS for carregado dentro do proprio iframe,
   // troca imediatamente para o escritorio real. Isso evita o efeito "menu dentro de menu".
@@ -24,6 +25,43 @@
   } catch (error) {
     // Se o browser bloquear acesso ao parent, ainda assim a URL absoluta do iframe e aplicada no DOMContentLoaded.
   }
+
+  function starkenOsBuildFromHtml(html) {
+    var match = String(html || '').match(/STARKEN_OS_BUILD\s*=\s*['"]([^'"]+)['"]/);
+    return match ? match[1] : '';
+  }
+
+  function starkenOsShowReloadNotice(latestBuild) {
+    if (document.getElementById('starkenOsReloadNotice')) return;
+    var notice = document.createElement('div');
+    notice.id = 'starkenOsReloadNotice';
+    notice.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483647;background:#0f172a;color:#fff;border:1px solid rgba(255,255,255,0.16);border-left:4px solid #10b981;border-radius:10px;padding:13px 15px;box-shadow:0 12px 34px rgba(0,0,0,0.28);font-family:Inter,system-ui,sans-serif;font-size:13px;max-width:360px';
+    notice.innerHTML = '<div style="font-weight:800;margin-bottom:5px">Nova versão disponível</div><div style="color:rgba(255,255,255,0.72);line-height:1.35;margin-bottom:10px">Atualize antes de publicar ou agendar para evitar usar uma versão antiga do sistema.</div><button id="starkenOsReloadBtn" style="border:0;border-radius:8px;background:#10b981;color:#04111d;font-weight:800;padding:8px 12px;cursor:pointer;font-family:inherit">Atualizar agora</button>';
+    document.body.appendChild(notice);
+    var btn = document.getElementById('starkenOsReloadBtn');
+    if (btn) btn.onclick = function() { window.location.reload(); };
+    console.warn('[Starken OS] Nova versão detectada:', latestBuild);
+  }
+
+  function starkenOsStartBuildWatcher() {
+    if (window.__starkenOsBuildWatcherStarted) return;
+    window.__starkenOsBuildWatcherStarted = true;
+    setInterval(function() {
+      fetch('/starken-os/?_build_check=' + Date.now(), { cache: 'no-store' })
+        .then(function(res) { return res.ok ? res.text() : ''; })
+        .then(function(html) {
+          var latest = starkenOsBuildFromHtml(html);
+          if (latest && latest !== window.STARKEN_OS_BUILD) {
+            var modalOpen = document.querySelector('.ct-task-modal.active, #ctMonthWizardModal[style*="flex"], #ctMaterialsPickerModal[style*="flex"]');
+            if (!modalOpen) window.location.reload();
+            else starkenOsShowReloadNotice(latest);
+          }
+        })
+        .catch(function() {});
+    }, 60000);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', starkenOsStartBuildWatcher);
+  else starkenOsStartBuildWatcher();
 })();
 </script>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
