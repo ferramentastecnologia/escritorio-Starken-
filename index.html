@@ -36392,6 +36392,15 @@ function paidTrafficCurrentUser() {
   return 'Sistema';
 }
 
+function tfActor() {
+  return paidTrafficCurrentUser();
+}
+
+function tfData(response) {
+  if (response && response.data !== undefined) return response.data;
+  return response;
+}
+
 function paidTrafficClients() {
   var clients = _metaClients || {};
   return Object.entries(clients).filter(function(entry) {
@@ -36546,8 +36555,9 @@ async function paidTrafficLoad() {
   paidTrafficRender();
 }
 
-function paidTrafficBuildSuggestions(tasks) {
+function paidTrafficBuildSuggestions(tasks, clientFilter) {
   var suggestions = [];
+  var selectedClient = clientFilter && _metaClients ? _metaClients[clientFilter] : null;
   var overdue = tasks.filter(paidTrafficIsOverdue);
   var noAssignee = tasks.filter(function(t) { return paidTrafficIsOpen(t) && !t.assignee; });
   var activeNoCampaign = tasks.filter(function(t) {
@@ -36563,12 +36573,14 @@ function paidTrafficBuildSuggestions(tasks) {
     return spend >= 20 && ctr > 0 && ctr < 1;
   });
 
-  if (overdue.length) suggestions.push({ icon:'priority_high', tone:'#ef4444', title: overdue.length + ' task(s) atrasada(s)', text:'Priorizar cobrança de prazo e responsável hoje.' });
-  if (noAssignee.length) suggestions.push({ icon:'person_off', tone:'#f59e0b', title: noAssignee.length + ' task(s) sem responsável', text:'Distribuir dono antes de iniciar otimização.' });
-  if (activeNoCampaign.length) suggestions.push({ icon:'link_off', tone:'#60a5fa', title: activeNoCampaign.length + ' campanha(s) sem ID Meta', text:'Vincular campaign_id para puxar métricas reais.' });
-  if (staleMetrics.length) suggestions.push({ icon:'sync_problem', tone:'#8b5cf6', title: staleMetrics.length + ' métrica(s) antigas', text:'Atualizar métricas para evitar decisão em dado velho.' });
-  if (lowCtr.length) suggestions.push({ icon:'ads_click', tone:'#fb7185', title: lowCtr.length + ' campanha(s) com CTR baixo', text:'Revisar criativo, copy e segmentação.' });
-  if (!suggestions.length) suggestions.push({ icon:'verified', tone:'#46eecd', title:'Operação sem alertas críticos', text:'Continue acompanhando métricas e prazos por cliente.' });
+  if (selectedClient && !selectedClient.adAccountId) suggestions.push({ icon:'settings', tone:'#f59e0b', title:'Cliente sem conta de anúncio', text:'Vincule a Ad Account antes de puxar métricas ou criar campanhas reais.', action:'config', actionLabel:'Configurar' });
+  if (selectedClient && !tasks.length) suggestions.push({ icon:'add_task', tone:'#46eecd', title:'Criar primeiro plano', text:'Este cliente ainda não tem operação de tráfego registrada.', action:'create_plan', actionLabel:'Criar plano' });
+  if (overdue.length) suggestions.push({ icon:'priority_high', tone:'#ef4444', title: overdue.length + ' task(s) atrasada(s)', text:'Priorizar cobrança de prazo e responsável hoje.', action:'operation', actionLabel:'Abrir operação' });
+  if (noAssignee.length) suggestions.push({ icon:'person_off', tone:'#f59e0b', title: noAssignee.length + ' task(s) sem responsável', text:'Distribuir dono antes de iniciar otimização.', action:'operation', actionLabel:'Distribuir' });
+  if (activeNoCampaign.length) suggestions.push({ icon:'link_off', tone:'#60a5fa', title: activeNoCampaign.length + ' campanha(s) sem ID Meta', text:'Vincular campaign_id para puxar métricas reais.', action:'operation', actionLabel:'Vincular' });
+  if (staleMetrics.length) suggestions.push({ icon:'sync_problem', tone:'#8b5cf6', title: staleMetrics.length + ' métrica(s) antigas', text:'Atualizar métricas para evitar decisão em dado velho.', action:'sync_metrics', actionLabel:'Atualizar' });
+  if (lowCtr.length) suggestions.push({ icon:'ads_click', tone:'#fb7185', title: lowCtr.length + ' campanha(s) com CTR baixo', text:'Revisar criativo, copy e segmentação.', action:'bi', actionLabel:'Ver BI' });
+  if (!suggestions.length) suggestions.push({ icon:'verified', tone:'#46eecd', title:'Operação sem alertas críticos', text:'Continue acompanhando métricas e prazos por cliente.', action:'operation', actionLabel:'Acompanhar' });
   return suggestions.slice(0, 6);
 }
 
@@ -36602,7 +36614,7 @@ function paidTrafficRender() {
   paidTrafficRenderClients(rows, clientFilter, statusFilter);
   paidTrafficRenderTasks(filteredTasks);
   paidTrafficRenderCampaigns(linked);
-  paidTrafficRenderSuggestions(paidTrafficBuildSuggestions(filteredTasks));
+  paidTrafficRenderSuggestions(paidTrafficBuildSuggestions(filteredTasks, clientFilter));
 }
 
 function paidTrafficRenderClients(rows, clientFilter, statusFilter) {
@@ -36625,7 +36637,11 @@ function paidTrafficRenderClients(rows, clientFilter, statusFilter) {
   });
 
   if (!visibleRows.length) {
-    el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-secondary)">Nenhuma campanha ou task de tráfego encontrada para este filtro.</div>';
+    if (clientFilter && _metaClients && _metaClients[clientFilter]) {
+      el.innerHTML = paidTrafficClientEmptyState(clientFilter, _metaClients[clientFilter]);
+    } else {
+      el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-secondary)">Nenhuma campanha ou task de tráfego encontrada para este filtro.</div>';
+    }
     return;
   }
 
@@ -36646,6 +36662,32 @@ function paidTrafficRenderClients(rows, clientFilter, statusFilter) {
         + '<button onclick="paidTrafficCreateCampaignPlan(\'' + c.key + '\')" style="padding:8px 10px;border:0;border-radius:9px;background:#46eecd;color:#061313;font-weight:900;cursor:pointer;font-family:inherit">Plano</button>'
       + '</div></div>';
   }).join('');
+}
+
+function paidTrafficClientEmptyState(clientKey, client) {
+  var hasAd = !!client.adAccountId;
+  var hasPage = !!client.pageId;
+  var hasIg = !!client.igUserId;
+  var hasWa = !!client.whatsappGroupJid;
+  function setupCard(icon, label, ok, value) {
+    return '<div style="padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--bg)">'
+      + '<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px"><span class="mso" style="color:' + (ok ? '#46eecd' : '#f59e0b') + '">' + icon + '</span><strong style="color:var(--text)">' + label + '</strong></div>'
+      + '<div style="font-size:.78rem;color:var(--text-secondary)">' + esc(value || (ok ? 'Configurado' : 'Pendente')) + '</div>'
+      + '</div>';
+  }
+  return '<div style="padding:18px;border:1px dashed rgba(70,238,205,.28);border-radius:16px;background:linear-gradient(135deg,rgba(70,238,205,.08),rgba(255,255,255,.02))">'
+    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px">'
+    + '<div><div style="font-weight:900;color:var(--text);font-size:1rem">' + esc(client.name || clientKey) + '</div><div style="font-size:.82rem;color:var(--text-secondary);margin-top:4px">Sem campanhas/tasks de tráfego neste filtro. Comece pelo plano operacional ou revise a configuração.</div></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button onclick="paidTrafficCreateCampaignPlan(\'' + clientKey + '\')" style="padding:9px 12px;border:0;border-radius:10px;background:#46eecd;color:#061313;font-weight:900;cursor:pointer;font-family:inherit"><span class="mso">add</span> Criar plano</button>'
+      + '<button onclick="switchTab(\'meta-config\')" style="padding:9px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font-weight:800;cursor:pointer;font-family:inherit"><span class="mso">settings</span> Configurar</button>'
+    + '</div></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px">'
+    + setupCard('payments', 'Conta de anúncio', hasAd, client.adAccountName || client.adAccountId)
+    + setupCard('flag', 'Página Meta', hasPage, client.pageName || client.pageId)
+    + setupCard('photo_camera', 'Instagram', hasIg, client.igUsername || client.igUserId)
+    + setupCard('forum', 'WhatsApp', hasWa, client.whatsappGroupJid)
+    + '</div></div>';
 }
 
 function paidTrafficRenderTasks(tasks) {
@@ -36698,9 +36740,30 @@ function paidTrafficRenderSuggestions(suggestions) {
   el.innerHTML = suggestions.map(function(s) {
     return '<div style="display:flex;gap:10px;padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(0,0,0,.14)">'
       + '<div style="width:32px;height:32px;border-radius:10px;background:' + s.tone + '22;color:' + s.tone + ';display:flex;align-items:center;justify-content:center;flex:0 0 auto"><span class="mso">' + s.icon + '</span></div>'
-      + '<div><div style="font-weight:900;color:var(--text);font-size:.84rem">' + esc(s.title) + '</div><div style="font-size:.75rem;color:var(--text-secondary);line-height:1.35;margin-top:3px">' + esc(s.text) + '</div></div>'
+      + '<div style="flex:1;min-width:0"><div style="font-weight:900;color:var(--text);font-size:.84rem">' + esc(s.title) + '</div><div style="font-size:.75rem;color:var(--text-secondary);line-height:1.35;margin-top:3px">' + esc(s.text) + '</div>'
+      + (s.action ? '<button onclick="paidTrafficRunLurdinhaAction(\'' + s.action + '\')" style="margin-top:8px;padding:6px 9px;border:1px solid rgba(70,238,205,.3);border-radius:8px;background:rgba(70,238,205,.1);color:#46eecd;font-weight:900;cursor:pointer;font-family:inherit;font-size:.72rem">' + esc(s.actionLabel || 'Executar') + '</button>' : '')
+      + '</div>'
       + '</div>';
   }).join('');
+}
+
+function paidTrafficSelectedClient() {
+  return document.getElementById('paidTrafficClientFilter') ? document.getElementById('paidTrafficClientFilter').value : '';
+}
+
+async function paidTrafficRunLurdinhaAction(action) {
+  var clientKey = paidTrafficSelectedClient();
+  if (action === 'create_plan') return paidTrafficCreateCampaignPlan(clientKey);
+  if (action === 'config') return switchTab('meta-config');
+  if (action === 'bi') return clientKey ? paidTrafficOpenBi(clientKey) : switchTab('meta-bi');
+  if (action === 'operation') return paidTrafficOpenTraffic(clientKey);
+  if (action === 'sync_metrics') {
+    if (!clientKey) return alert('Selecione um cliente para atualizar métricas.');
+    var res = await tfApi('bulk_sync_metrics', { client_id: clientKey, user: tfActor() });
+    if (res.error) return alert('Erro: ' + (res.message || res.error));
+    showToast('<span class="mso">sync</span> Métricas atualizadas: ' + (res.synced || 0));
+    paidTrafficRefresh();
+  }
 }
 
 function paidTrafficOpenTraffic(clientKey) {
@@ -36781,6 +36844,9 @@ function tfInit() {
   if (tfCurrentClient) {
     sel.value = tfCurrentClient;
     tfLoadGroups();
+  } else {
+    tfGroups = [];
+    tfRenderList();
   }
 }
 
@@ -36788,6 +36854,7 @@ async function tfLoadGroups() {
   const clientId = document.getElementById('tfClientFilter') ? document.getElementById('tfClientFilter').value : '';
   const addBtn = document.getElementById('tfAddGroupBtn');
   if (!clientId) {
+    tfCurrentClient = '';
     tfGroups = [];
     tfRenderList();
     if (addBtn) addBtn.style.display = 'none';
@@ -36797,11 +36864,11 @@ async function tfLoadGroups() {
   if (addBtn) addBtn.style.display = '';
 
   const gRes = await tfApi('list_groups', { client_id: clientId });
-  const groups = gRes.data || [];
+  const groups = tfData(gRes) || [];
 
   for (var i = 0; i < groups.length; i++) {
     const tRes = await tfApi('list_tasks', { group_id: groups[i].id });
-    groups[i].tasks = tRes.data || [];
+    groups[i].tasks = tfData(tRes) || [];
   }
   tfGroups = groups;
   tfRenderList();
@@ -36819,10 +36886,7 @@ function tfRenderList() {
   const assigneeFilter = document.getElementById('tfAssigneeFilter') ? document.getElementById('tfAssigneeFilter').value : '';
 
   if (!tfGroups.length) {
-    body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary)">'
-      + '<div style="font-size:2rem;margin-bottom:8px"><span class="mso">campaign</span></div>'
-      + (tfCurrentClient ? 'Nenhum grupo criado. Clique em "+ Novo Grupo"' : 'Selecione um cliente para ver as campanhas')
-      + '</div>';
+    body.innerHTML = tfCurrentClient ? tfEmptyClientState() : tfOperationLandingState();
     return;
   }
 
@@ -36886,6 +36950,48 @@ function tfRenderList() {
   tfUpdateActionBar();
 }
 
+function tfOperationLandingState() {
+  var clientCount = paidTrafficClients().length;
+  return '<div style="padding:24px">'
+    + '<div style="display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-bottom:18px">'
+    + paidTrafficKpiCard('<span class="mso">groups</span>', 'Clientes ativos', clientCount, 'prontos para operação', 'rgba(70,238,205,.14)')
+    + paidTrafficKpiCard('<span class="mso">settings</span>', 'Configuração', 'Meta', 'páginas, IG e ad accounts', 'rgba(96,165,250,.14)')
+    + paidTrafficKpiCard('<span class="mso">bar_chart</span>', 'Métricas', 'BI', 'campanhas e relatórios', 'rgba(34,197,94,.14)')
+    + paidTrafficKpiCard('<span class="mso">psychology_alt</span>', 'Lurdinha', 'Ativa', 'ações e sugestões', 'rgba(245,158,11,.14)')
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1.3fr .7fr;gap:14px">'
+    + '<section style="padding:18px;border:1px solid var(--border);border-radius:16px;background:var(--card)">'
+      + '<h3 style="margin:0 0 8px;color:var(--text)">Comece por um cliente</h3>'
+      + '<p style="margin:0 0 14px;color:var(--text-secondary);line-height:1.45">A operação de tráfego agora funciona como painel por cliente: selecione um cliente acima para ver grupos, campanhas, métricas, criativos, tarefas e responsáveis.</p>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+        + '<button onclick="switchTab(\'paid-traffic\')" style="padding:10px 13px;border:0;border-radius:10px;background:#46eecd;color:#061313;font-weight:900;cursor:pointer;font-family:inherit"><span class="mso">query_stats</span> Ver visão geral</button>'
+        + '<button onclick="switchTab(\'meta-config\')" style="padding:10px 13px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-weight:800;cursor:pointer;font-family:inherit"><span class="mso">settings</span> Configurar contas</button>'
+      + '</div>'
+    + '</section>'
+    + '<section style="padding:18px;border:1px solid rgba(70,238,205,.28);border-radius:16px;background:linear-gradient(135deg,rgba(70,238,205,.1),rgba(0,0,0,.08))">'
+      + '<h3 style="margin:0 0 8px;color:var(--text)"><span class="mso">psychology_alt</span> Lurdinha recomenda</h3>'
+      + '<p style="margin:0;color:var(--text-secondary);font-size:.85rem;line-height:1.45">Escolha um cliente e crie o primeiro plano de campanha. Depois vincule o campaign_id para que a Lurdinha consiga sugerir otimizações com dados reais.</p>'
+    + '</section>'
+    + '</div>'
+    + '</div>';
+}
+
+function tfEmptyClientState() {
+  var c = (_metaClients && _metaClients[tfCurrentClient]) ? _metaClients[tfCurrentClient] : {};
+  return '<div style="padding:24px">'
+    + '<div style="padding:22px;border:1px dashed rgba(70,238,205,.28);border-radius:16px;background:linear-gradient(135deg,rgba(70,238,205,.08),rgba(255,255,255,.02));text-align:left">'
+      + '<div style="font-size:.72rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#46eecd;margin-bottom:8px">Operação de tráfego</div>'
+      + '<h3 style="margin:0;color:var(--text)">Nenhum grupo de campanha para ' + esc(c.name || tfCurrentClient) + '</h3>'
+      + '<p style="margin:8px 0 16px;color:var(--text-secondary);line-height:1.45">Crie um grupo para organizar campanhas, tarefas, responsáveis, orçamento, métricas e campaign_id. Esta é a base que alimenta a visão geral e o portal do cliente.</p>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+        + '<button onclick="tfShowNewGroupModal()" style="padding:10px 13px;border:0;border-radius:10px;background:#46eecd;color:#061313;font-weight:900;cursor:pointer;font-family:inherit"><span class="mso">add</span> Criar grupo</button>'
+        + '<button onclick="paidTrafficCreateCampaignPlan(\'' + tfCurrentClient + '\')" style="padding:10px 13px;border:1px solid rgba(70,238,205,.35);border-radius:10px;background:rgba(70,238,205,.08);color:#46eecd;font-weight:900;cursor:pointer;font-family:inherit"><span class="mso">add_task</span> Criar plano rápido</button>'
+        + '<button onclick="switchTab(\'meta-config\')" style="padding:10px 13px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font-weight:800;cursor:pointer;font-family:inherit"><span class="mso">settings</span> Ver configuração</button>'
+      + '</div>'
+    + '</div>'
+    + '</div>';
+}
+
 function tfToggleGroup(id) {
   tfExpandedGroups[id] = tfExpandedGroups[id] === false ? true : (tfExpandedGroups[id] === undefined ? false : !tfExpandedGroups[id]);
   tfRenderList();
@@ -36896,14 +37002,14 @@ async function tfAddTask(groupId, name) {
     group_id: groupId,
     client_id: tfCurrentClient,
     name: name,
-    user: typeof _currentUser !== 'undefined' ? _currentUser : 'Juan'
+    user: tfActor()
   });
   await tfLoadGroups();
 }
 
 async function tfDeleteGroup(id, name) {
   if (!confirm('Excluir grupo "' + name + '"?')) return;
-  await tfApi('delete_group', { id: id });
+  await tfApi('delete_group', { id: id, user: tfActor() });
   await tfLoadGroups();
 }
 
@@ -36976,7 +37082,7 @@ function tfShowAssigneeDropdown(event, taskId) {
   unOpt.onmouseout = function() { unOpt.style.background = 'none'; };
   unOpt.onclick = async function() {
     dd.remove();
-    await tfApi('upsert_task', { id: taskId, assignee: null });
+    await tfApi('upsert_task', { id: taskId, assignee: null, user: tfActor() });
     await tfLoadGroups();
   };
   dd.appendChild(unOpt);
@@ -36989,7 +37095,7 @@ function tfShowAssigneeDropdown(event, taskId) {
     opt.onmouseout = function() { opt.style.background = 'none'; };
     opt.onclick = async function() {
       dd.remove();
-      await tfApi('upsert_task', { id: taskId, assignee: u.name });
+      await tfApi('upsert_task', { id: taskId, assignee: u.name, user: tfActor() });
       await tfLoadGroups();
     };
     dd.appendChild(opt);
@@ -37023,7 +37129,7 @@ function tfShowPriorityDropdown(event, taskId) {
     opt.onmouseout = function() { opt.style.background = 'none'; };
     opt.onclick = async function() {
       dd.remove();
-      await tfApi('upsert_task', { id: taskId, priority: p.key });
+      await tfApi('upsert_task', { id: taskId, priority: p.key, user: tfActor() });
       for (var i = 0; i < tfGroups.length; i++) {
         var t = (tfGroups[i].tasks || []).find(function(x) { return x.id === taskId; });
         if (t) { t.priority = p.key; break; }
@@ -37117,7 +37223,7 @@ async function tfBulkChangeAssignee() {
   if (!name) return;
   var ids = Array.from(tfSelectedIds);
   for (var i = 0; i < ids.length; i++) {
-    await tfApi('upsert_task', { id: ids[i], assignee: name });
+    await tfApi('upsert_task', { id: ids[i], assignee: name, user: tfActor() });
   }
   tfClearSelection();
   await tfLoadGroups();
@@ -37138,7 +37244,7 @@ async function tfBulkChangePriority() {
       dd.remove();
       var ids = Array.from(tfSelectedIds);
       for (var i = 0; i < ids.length; i++) {
-        await tfApi('upsert_task', { id: ids[i], priority: p.key });
+        await tfApi('upsert_task', { id: ids[i], priority: p.key, user: tfActor() });
       }
       tfClearSelection();
       await tfLoadGroups();
@@ -37155,7 +37261,7 @@ async function tfBulkChangePriority() {
 
 async function tfBulkSyncMetrics() {
   if (!tfCurrentClient) return;
-  const res = await tfApi('bulk_sync_metrics', { client_id: tfCurrentClient });
+  const res = await tfApi('bulk_sync_metrics', { client_id: tfCurrentClient, user: tfActor() });
   if (res.error) { alert('Erro: ' + res.message); return; }
   alert('Métricas atualizadas: ' + (res.synced || 0) + ' campanhas');
   await tfLoadGroups();
@@ -37165,7 +37271,7 @@ async function tfBulkDelete() {
   if (!confirm('Excluir ' + tfSelectedIds.size + ' campanhas?')) return;
   var ids = Array.from(tfSelectedIds);
   for (var i = 0; i < ids.length; i++) {
-    await tfApi('delete_task', { id: ids[i] });
+    await tfApi('delete_task', { id: ids[i], user: tfActor() });
   }
   tfClearSelection();
   await tfLoadGroups();
@@ -37211,18 +37317,20 @@ async function tfCreateNewGroup() {
   const res = await tfApi('upsert_group', {
     client_id: tfCurrentClient,
     name: name,
-    user: typeof _currentUser !== 'undefined' ? _currentUser : 'Juan'
+    user: tfActor()
   });
 
-  if (res.data && res.data.id) {
+  const groupData = tfData(res);
+  const group = Array.isArray(groupData) ? groupData[0] : groupData;
+  if (group && group.id) {
     const tasksEl = document.getElementById('tfNewGroupTasks');
     const lines = tasksEl ? tasksEl.value.split('\n').map(function(l) { return l.trim(); }).filter(Boolean) : [];
     for (var i = 0; i < lines.length; i++) {
       await tfApi('upsert_task', {
-        group_id: res.data.id,
+        group_id: group.id,
         client_id: tfCurrentClient,
         name: lines[i],
-        user: typeof _currentUser !== 'undefined' ? _currentUser : 'Juan'
+        user: tfActor()
       });
     }
   }
@@ -37236,7 +37344,7 @@ async function tfCreateNewGroup() {
 async function tfOpenModal(taskId) {
   const res = await tfApi('get_task', { id: taskId });
   if (res.error) return;
-  tfModalTask = res.data;
+  tfModalTask = tfData(res);
 
   document.querySelectorAll('.tf-modal-overlay').forEach(function(d) { d.remove(); });
 
@@ -37355,7 +37463,7 @@ function tfCloseModal() {
 
 async function tfSaveTaskField(field, value) {
   if (!tfModalTask) return;
-  var payload = { id: tfModalTask.id };
+  var payload = { id: tfModalTask.id, user: tfActor() };
   payload[field] = value;
   await tfApi('upsert_task', payload);
   tfModalTask[field] = value;
@@ -37374,7 +37482,7 @@ async function tfAddComment() {
 
   await tfApi('add_comment', {
     task_id: tfModalTask.id,
-    author: typeof _currentUser !== 'undefined' ? _currentUser : 'Juan',
+    author: tfActor(),
     body: body
   });
   if (input) input.value = '';
@@ -37383,7 +37491,7 @@ async function tfAddComment() {
 
 async function tfSyncTaskMetrics(taskId) {
   if (!tfCurrentClient) return;
-  const res = await tfApi('sync_metrics', { task_id: taskId, client_id: tfCurrentClient });
+  const res = await tfApi('sync_metrics', { task_id: taskId, client_id: tfCurrentClient, user: tfActor() });
   if (res.error) { alert('Erro: ' + (res.message || 'Falha ao sincronizar')); return; }
   tfOpenModal(taskId);
 }
@@ -37396,7 +37504,8 @@ async function tfLinkCampaign(taskId) {
   const res = await tfApi('link_campaign', {
     task_id: taskId,
     campaign_id: campaignId,
-    client_id: tfCurrentClient
+    client_id: tfCurrentClient,
+    user: tfActor()
   });
   if (res.error) { alert('Erro: ' + (res.message || 'Falha ao vincular')); return; }
   tfOpenModal(taskId);
