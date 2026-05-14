@@ -11,7 +11,7 @@
 (function() {
   var OFFICE_GAME_PATH = '/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=4';
   window.STARKEN_OFFICE_GAME_PATH = OFFICE_GAME_PATH;
-  window.STARKEN_OS_BUILD = '20260514-1626-sidebar-scroll-alpha-hidden';
+  window.STARKEN_OS_BUILD = '20260514-1638-cronograma-flow-safe';
 
   // Se por qualquer cache/clique antigo o Starken OS for carregado dentro do proprio iframe,
   // troca imediatamente para o escritorio real. Isso evita o efeito "menu dentro de menu".
@@ -4513,6 +4513,7 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
 .ctl-home-score.warn { background: rgba(251,191,36,.12); color:#fbbf24; border-color: rgba(251,191,36,.28); }
 .ctl-home-score.bad { background: rgba(239,68,68,.12); color:#f87171; border-color: rgba(239,68,68,.28); }
 .ctl-home-chip { display:inline-flex; align-items:center; gap:4px; border-radius:999px; padding:3px 7px; font-size:.68rem; font-weight:900; border:1px solid var(--border); color:var(--text-secondary); background:var(--card); }
+.ctl-home-chip:is(button,a) { cursor:pointer; font-family:inherit; line-height:1; white-space:nowrap; }
 .ctl-home-chip.ok { color:#46eecd; border-color:rgba(70,238,205,.25); background:rgba(70,238,205,.08); }
 .ctl-home-chip.warn { color:#fbbf24; border-color:rgba(251,191,36,.28); background:rgba(251,191,36,.08); }
 .ctl-home-chip.bad { color:#f87171; border-color:rgba(239,68,68,.28); background:rgba(239,68,68,.08); }
@@ -13787,11 +13788,23 @@ function _dashGetStatus(clientId, type, periodKey) {
   // For sched-weekly, use cronograma_status cache (Supabase)
   if (type === 'sched-weekly' && typeof getCronogramaStatus === 'function') {
     var cs = getCronogramaStatus(clientId, periodKey);
-    if (cs) return { status: cs.status || 0, sent_date: cs.sent_date, generated_at: cs.generated_at };
+    if (cs) return { status: Number(cs.status || 0), sent_date: cs.sent_date, generated_at: cs.generated_at, pdf_url: cs.pdf_url || '', pdf_name: cs.pdf_name || '' };
   }
   // Fallback to localStorage reports
   var rpt = data.reports.find(function(r) { return r.clientId === clientId && r.type === type && r.period === periodKey; });
-  return rpt ? { status: rpt.status || 0, sent_date: rpt.sentDate } : { status: 0 };
+  return rpt ? { status: Number(rpt.status || 0), sent_date: rpt.sentDate, pdf_url: rpt.cronogramaPdfUrl || '', pdf_name: rpt.cronogramaPdfName || '' } : { status: 0 };
+}
+
+function cronoRefreshAllViews() {
+  _opScoreCache = {};
+  _dashWeekPostsCache = {};
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderSchedWeekly === 'function') {
+    try { renderSchedWeekly(); } catch(e) {}
+  }
+  if (typeof clientTimelineRenderHome === 'function' && (typeof _ctlClientSlug === 'undefined' || !_ctlClientSlug)) {
+    try { clientTimelineRenderHome(); } catch(e2) {}
+  }
 }
 
 // Get current week periodKey — mirrors renderSchedWeekly auto-select logic exactly
@@ -15347,7 +15360,7 @@ function renderDashWeekCronoList(weekKey, active) {
     var st = _dashGetStatus(c.id, 'sched-weekly', weekKey);
     var coTenant = c.company === 'Alpha' ? 'alpha' : 'starken';
     var metaKey = (typeof findMetaClientKey === 'function') ? findMetaClientKey(c.name, coTenant) : null;
-    var item = { name: c.name, company: c.company, id: c.id, metaKey: metaKey, status: st.status, sent_date: st.sent_date };
+    var item = { name: c.name, company: c.company, id: c.id, metaKey: metaKey, status: st.status, sent_date: st.sent_date, pdf_url: st.pdf_url || '', pdf_name: st.pdf_name || '' };
     if (st.status === 2) enviados.push(item);
     else if (st.status >= 1) gerados.push(item);
     else pendentes.push(item);
@@ -15380,14 +15393,25 @@ function renderDashWeekCronoList(weekKey, active) {
     var btns = '';
     var sid = 'dcrBtn_' + item.id + '_' + weekKey + '_' + groupKey;
     if (groupKey === 'pendentes') {
-      btns += '<button id="' + sid + '_g" class="dash-act-btn gerar" onclick="event.stopPropagation();dashMarkCronoStatus(' + JSON.stringify(item.id) + ',' + JSON.stringify(weekKey) + ',1,this)" title="Marcar como Gerado"><span class="mso" style="font-size:12px">description</span> Gerar</button>';
-      btns += '<button id="' + sid + '_e" class="dash-act-btn enviar" onclick="event.stopPropagation();dashMarkCronoStatus(' + JSON.stringify(item.id) + ',' + JSON.stringify(weekKey) + ',2,this)" title="Marcar como Enviado"><span class="mso" style="font-size:12px">upload</span> Enviar</button>';
+      if (item.metaKey) {
+        btns += '<button id="' + sid + '_g" class="dash-act-btn gerar" onclick="event.stopPropagation();cronogramaFromSchedule(' + JSON.stringify(item.metaKey) + ',' + JSON.stringify(item.id) + ',\'sched-weekly\',' + JSON.stringify(weekKey) + ')" title="Abrir gerador real do cronograma"><span class="mso" style="font-size:12px">description</span> Gerar</button>';
+      } else {
+        btns += '<button class="dash-act-btn gerar" disabled title="Cliente sem vínculo no conteúdo">Sem vínculo</button>';
+      }
     } else if (groupKey === 'gerados') {
-      btns += '<button id="' + sid + '_e" class="dash-act-btn enviar" onclick="event.stopPropagation();dashMarkCronoStatus(' + JSON.stringify(item.id) + ',' + JSON.stringify(weekKey) + ',2,this)" title="Marcar como Enviado"><span class="mso" style="font-size:12px">upload</span> Enviar</button>';
+      if (item.pdf_url) {
+        btns += '<a class="dash-act-btn gerar" href="' + item.pdf_url + '" target="_blank" onclick="event.stopPropagation()" title="Abrir PDF gerado" style="text-decoration:none">PDF</a>';
+        btns += '<button id="' + sid + '_e" class="dash-act-btn enviar" onclick="event.stopPropagation();zappfySendReport(' + JSON.stringify(item.id) + ',\'sched-weekly\',' + JSON.stringify(weekKey) + ')" title="Enviar cronograma via WhatsApp"><span class="mso" style="font-size:12px">upload</span> Enviar</button>';
+      } else if (item.metaKey) {
+        btns += '<button id="' + sid + '_g" class="dash-act-btn gerar" onclick="event.stopPropagation();cronogramaFromSchedule(' + JSON.stringify(item.metaKey) + ',' + JSON.stringify(item.id) + ',\'sched-weekly\',' + JSON.stringify(weekKey) + ')" title="Status gerado sem PDF: gere novamente"><span class="mso" style="font-size:12px">description</span> Gerar PDF</button>';
+      } else {
+        btns += '<button class="dash-act-btn enviar" disabled title="Gere o PDF antes de enviar">Sem PDF</button>';
+      }
       btns += '<button id="' + sid + '_u" class="dash-act-btn undo" onclick="event.stopPropagation();dashMarkCronoStatus(' + JSON.stringify(item.id) + ',' + JSON.stringify(weekKey) + ',0,this)" title="Voltar para Pendente">↩</button>';
     } else if (groupKey === 'enviados') {
       var sentDate = item.sent_date ? new Date(item.sent_date).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
-      btns = '<span class="dash-client-date">' + sentDate + '</span>'
+      btns = (item.pdf_url ? '<a class="dash-act-btn gerar" href="' + item.pdf_url + '" target="_blank" onclick="event.stopPropagation()" title="Abrir PDF enviado" style="text-decoration:none">PDF</a>' : '')
+           + '<span class="dash-client-date">' + sentDate + '</span>'
            + '<button id="' + sid + '_u" class="dash-act-btn undo" onclick="event.stopPropagation();dashMarkCronoStatus(' + JSON.stringify(item.id) + ',' + JSON.stringify(weekKey) + ',0,this)" title="Voltar para Pendente">↩</button>';
     }
     var chip = '';
@@ -15456,7 +15480,15 @@ async function dashMarkCronoStatus(clientId, periodKey, newStatus, btn) {
     status: newStatus,
     updated_at: now
   };
-  if (newStatus === 2) { payload.sent = true; payload.sent_date = now; }
+  if (newStatus === 2) {
+    var current = (typeof getCronogramaStatus === 'function') ? getCronogramaStatus(clientId, periodKey) : null;
+    if (!current || !current.pdf_url) {
+      if (typeof showToast === 'function') showToast('Gere o PDF antes de marcar como enviado.', 'warning');
+      if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+      return;
+    }
+    payload.sent = true; payload.sent_date = now; payload.pdf_url = current.pdf_url; payload.pdf_name = current.pdf_name || null;
+  }
   else if (newStatus === 1) { payload.sent = false; payload.generated_at = now; }
   else { payload.sent = false; payload.sent_date = null; payload.generated_at = null; payload.pdf_url = null; payload.pdf_name = null; }
 
@@ -15474,15 +15506,11 @@ async function dashMarkCronoStatus(clientId, periodKey, newStatus, btn) {
     _cronogramaStatusCache[csId] = Object.assign(_cronogramaStatusCache[csId] || {}, payload);
     _cronogramaStatusCache[clientId + '_' + periodKey] = _cronogramaStatusCache[csId];
 
-    // Invalidate dependent caches so score + recent sends recalculate
-    _opScoreCache = {};
-    _dashWeekPostsCache = {};
-
     if (typeof showToast === 'function') {
       var lbl = newStatus === 2 ? '<span class="mso">upload</span> Enviado' : newStatus === 1 ? '<span class="mso">description</span> Gerado' : '↩ Pendente';
       showToast(lbl, 'success');
     }
-    if (typeof renderDashboard === 'function') renderDashboard();
+    cronoRefreshAllViews();
   } catch(e) {
     console.warn('dashMarkCronoStatus error:', e);
     if (typeof showToast === 'function') showToast('Erro: ' + e.message, 'error'); else console.error('dashMarkCronoStatus error:', e);
@@ -19242,7 +19270,17 @@ async function zappfyExecuteSend(clientId, type, periodKey, metaKey, groupJid) {
           }, { onConflict: 'id' });
           // Update local cache
           if (typeof _cronogramaStatusCache !== 'undefined') {
-            _cronogramaStatusCache[csId] = { status: 2, sent: true, sent_date: new Date().toISOString(), pdf_url: pdfUrl };
+            var sentNowIso = new Date().toISOString();
+            _cronogramaStatusCache[csId] = Object.assign(_cronogramaStatusCache[csId] || {}, {
+              id: csId,
+              client_id: clientId,
+              period_key: periodKey,
+              status: 2,
+              sent: true,
+              sent_date: sentNowIso,
+              pdf_url: pdfUrl,
+              updated_at: sentNowIso
+            });
           }
         } catch(e) { console.warn('Supabase sent status error:', e); }
       }
@@ -19250,11 +19288,11 @@ async function zappfyExecuteSend(clientId, type, periodKey, metaKey, groupJid) {
       // Update local data.reports
       var cronoRpt = data.reports.find(function(r) { return r.clientId === clientId && r.type === 'sched-weekly'; });
       if (cronoRpt) {
-        cronoRpt.status = 'enviado';
+        cronoRpt.status = 2;
         cronoRpt.sent = true;
         cronoRpt.sentDate = new Date().toISOString();
       }
-      try { saveReports(); } catch(e) {}
+      try { saveData(data); } catch(e) { try { saveReports(); } catch(e2) {} }
 
       // Re-render list to show updated status
       setTimeout(function() {
@@ -19264,12 +19302,15 @@ async function zappfyExecuteSend(clientId, type, periodKey, metaKey, groupJid) {
           _supabase.from('cronograma_status').select('*').limit(500).then(function(res) {
             if (res.data) {
               if (typeof _cronogramaStatusCache === 'undefined') window._cronogramaStatusCache = {};
-              res.data.forEach(function(row) { _cronogramaStatusCache[row.id] = row; });
+              res.data.forEach(function(row) {
+                _cronogramaStatusCache[row.id] = row;
+                if (row.client_id && row.period_key) _cronogramaStatusCache[row.client_id + '_' + row.period_key] = row;
+              });
             }
-            if (typeof renderSchedWeekly === 'function') renderSchedWeekly();
+            cronoRefreshAllViews();
           });
         } else {
-          if (typeof renderAll === 'function') renderAll();
+          cronoRefreshAllViews();
         }
       }, 2000);
       return;
@@ -30658,7 +30699,12 @@ function clientTimelineHomeSnapshot() {
     if (status === 2) crono.sent++;
     else if (status >= 1) crono.generated++;
     else crono.pending++;
-    crono.rows.push(Object.assign({}, c, { cronoStatus: status, sent_date: st && st.sent_date }));
+    crono.rows.push(Object.assign({}, c, {
+      cronoStatus: status,
+      sent_date: st && st.sent_date,
+      pdf_url: st && st.pdf_url,
+      pdf_name: st && st.pdf_name
+    }));
   });
   var tasks = _ctlHomeTasks || [];
   var today = new Date();
@@ -30740,10 +30786,21 @@ function clientTimelineRenderHome() {
   var cronoRows = snap.crono.rows.filter(function(r) { return r.cronoStatus !== 2; }).slice(0, 8).map(function(r) {
     var label = r.cronoStatus >= 1 ? 'Gerado, falta enviar' : 'Pendente';
     var cls = r.cronoStatus >= 1 ? 'warn' : 'bad';
+    var actions = '';
+    if (r.cronoStatus >= 1) {
+      if (r.pdf_url) {
+        actions += '<a class="ctl-home-chip" href="' + ctlEsc(r.pdf_url) + '" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none">PDF</a>';
+        actions += '<button class="ctl-home-chip warn" onclick="event.stopPropagation();zappfySendReport(' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')">Enviar</button>';
+      } else if (r.metaKey) {
+        actions += '<button class="ctl-home-chip warn" onclick="event.stopPropagation();cronogramaFromSchedule(' + ctlJsArg(r.metaKey) + ',' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')">Gerar PDF</button>';
+      }
+    } else if (r.metaKey) {
+      actions += '<button class="ctl-home-chip bad" onclick="event.stopPropagation();cronogramaFromSchedule(' + ctlJsArg(r.metaKey) + ',' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')">Gerar</button>';
+    }
     return '<div class="ctl-home-row" onclick="clientTimelineSelectClient(' + ctlJsArg(r.metaKey || r.id) + ')">' +
       '<div class="ctl-home-score ' + cls + '">' + (r.cronoStatus >= 1 ? 'G' : '!') + '</div>' +
       '<div><strong>' + ctlEsc(r.name) + '</strong><small>' + ctlEsc(r.company + ' · ' + label) + '</small></div>' +
-      '<span class="ctl-home-chip ' + cls + '">' + label + '</span>' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-left:auto">' + actions + '<span class="ctl-home-chip ' + cls + '">' + label + '</span></div>' +
     '</div>';
   }).join('') || '<div class="ctl-home-empty"><span class="mso">task_alt</span><br>Todos os cronogramas da semana foram enviados.</div>';
   var criticalRows = snap.critical.slice(0, 8).map(function(c) { return clientTimelineHomeClientRow(c, 'atenção'); }).join('') || '<div class="ctl-home-empty">Nenhum cliente crítico neste momento.</div>';
@@ -34066,8 +34123,8 @@ async function cronogramaBuildPdf(opts) {
     }
 
     ctUpdateCronoStatusBar();
-    // Re-render schedule list to show PDF button
-    if (typeof renderSchedWeekly === 'function') renderSchedWeekly();
+    // Re-render connected views to show PDF button and updated status.
+    cronoRefreshAllViews();
 
     // Remove overlay
     var ov = document.getElementById('cronoLoadingOverlay');
