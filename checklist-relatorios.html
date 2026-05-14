@@ -4406,6 +4406,64 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
   margin-top: 10px;
 }
 .ctl-note-box input { flex: 1; }
+.ctl-home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 14px;
+}
+.ctl-home-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  min-height: 160px;
+}
+.ctl-home-card h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ctl-home-card h3 .mso { color: var(--starken); }
+.ctl-home-span-2 { grid-column: 1 / -1; }
+.ctl-home-progress { display: flex; flex-direction: column; gap: 12px; }
+.ctl-home-progress-row { display: grid; grid-template-columns: 140px minmax(0,1fr) 84px; gap: 10px; align-items: center; }
+.ctl-home-progress-label { font-size: 0.82rem; color: var(--text); font-weight: 850; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ctl-home-progress-meta { font-size: 0.7rem; color: var(--text-muted); text-align:right; }
+.ctl-home-bar { height: 8px; border-radius: 999px; background: var(--bg); overflow: hidden; border: 1px solid var(--border); }
+.ctl-home-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #46eecd, #60a5fa); }
+.ctl-home-list { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow: auto; padding-right: 2px; }
+.ctl-home-row {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: transform .15s, background .15s, border-color .15s;
+}
+.ctl-home-row:hover { transform: translateY(-1px); border-color: rgba(70,238,205,.35); background: rgba(70,238,205,.05); }
+.ctl-home-row strong { display:block; color: var(--text); font-size: .82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ctl-home-row small { display:block; margin-top:3px; color: var(--text-muted); font-size:.7rem; }
+.ctl-home-score { width: 42px; height: 42px; border-radius: 12px; display:flex; align-items:center; justify-content:center; font-weight:950; background: rgba(70,238,205,.13); color: var(--starken); border:1px solid rgba(70,238,205,.25); }
+.ctl-home-score.warn { background: rgba(251,191,36,.12); color:#fbbf24; border-color: rgba(251,191,36,.28); }
+.ctl-home-score.bad { background: rgba(239,68,68,.12); color:#f87171; border-color: rgba(239,68,68,.28); }
+.ctl-home-chip { display:inline-flex; align-items:center; gap:4px; border-radius:999px; padding:3px 7px; font-size:.68rem; font-weight:900; border:1px solid var(--border); color:var(--text-secondary); background:var(--card); }
+.ctl-home-chip.ok { color:#46eecd; border-color:rgba(70,238,205,.25); background:rgba(70,238,205,.08); }
+.ctl-home-chip.warn { color:#fbbf24; border-color:rgba(251,191,36,.28); background:rgba(251,191,36,.08); }
+.ctl-home-chip.bad { color:#f87171; border-color:rgba(239,68,68,.28); background:rgba(239,68,68,.08); }
+.ctl-home-empty { padding: 18px; color: var(--text-muted); text-align:center; border:1px dashed var(--border); border-radius:10px; background:var(--bg); }
+@media (max-width: 980px) {
+  .ctl-home-grid { grid-template-columns: 1fr; }
+  .ctl-home-progress-row { grid-template-columns: 1fr; gap:6px; }
+  .ctl-home-progress-meta { text-align:left; }
+}
 @media (max-width: 980px) {
   .ctl-toolbar { flex-direction: column; }
   .ctl-actions { width: 100%; justify-content: stretch; }
@@ -29923,6 +29981,10 @@ function ctlEsc(v) {
   });
 }
 
+function ctlJsArg(v) {
+  return JSON.stringify(String(v == null ? '' : v)).replace(/"/g, '&quot;');
+}
+
 function clientTimelineInit() {
   _clientTimelineReady = true;
   clientTimelineLoadClients();
@@ -29932,7 +29994,10 @@ function clientTimelineInit() {
     if (sel && _ctlClientSlug) sel.value = _ctlClientSlug;
   }
   if (_ctlClientSlug) clientTimelineRefresh();
-  else clientTimelineRenderEmpty('Selecione um cliente para montar a timeline operacional.');
+  else {
+    clientTimelineRenderHome();
+    clientTimelineRefreshHome();
+  }
 }
 
 function clientTimelineLoadClients() {
@@ -29967,14 +30032,16 @@ function clientTimelineSelectClient(slug) {
   if (sel && sel.value !== _ctlClientSlug) sel.value = _ctlClientSlug;
   if (!_ctlClientSlug) {
     _ctlTasks = [];
-    clientTimelineRenderEmpty('Selecione um cliente para montar a timeline operacional.');
+    clientTimelineRenderHome();
+    clientTimelineRefreshHome();
     return;
   }
   clientTimelineRefresh();
 }
 
 async function clientTimelineRefresh() {
-  if (!_ctlClientSlug || _ctlLoading) return;
+  if (!_ctlClientSlug) return clientTimelineRefreshHome(true);
+  if (_ctlLoading) return;
   _ctlLoading = true;
   clientTimelineRenderEmpty('Carregando timeline...');
   try {
@@ -30060,6 +30127,230 @@ function clientTimelineNextStatus(status) {
   })[status || 'a-fazer'] || null;
 }
 
+var _ctlHomeTasks = [];
+var _ctlHomeLoaded = false;
+var _ctlHomeLoading = false;
+
+function clientTimelineActiveClients() {
+  var list = [];
+  if (typeof data !== 'undefined' && data.clients && data.clients.length) {
+    list = data.clients.filter(function(c) { return c && c.active && (typeof ctIsClientOperational !== 'function' || ctIsClientOperational(c.id)); }).map(function(c) {
+      var tenant = c.company === 'Alpha' ? 'alpha' : 'starken';
+      var metaKey = (typeof findMetaClientKey === 'function') ? findMetaClientKey(c.name, tenant) : c.id;
+      return { id: c.id, metaKey: metaKey || c.id, name: c.name || c.id, company: c.company || (tenant === 'alpha' ? 'Alpha' : 'Starken'), tenant: tenant };
+    });
+  }
+  if (!list.length && typeof _metaClients !== 'undefined') {
+    Object.keys(_metaClients || {}).forEach(function(key) {
+      var c = _metaClients[key] || {};
+      if (typeof ctIsClientOperational === 'function' && !ctIsClientOperational(key)) return;
+      var tenant = c.tenant === 'alpha' ? 'alpha' : 'starken';
+      list.push({ id: key, metaKey: key, name: c.name || key, company: tenant === 'alpha' ? 'Alpha' : 'Starken', tenant: tenant });
+    });
+  }
+  return list.sort(function(a,b) { return a.name.localeCompare(b.name, 'pt-BR'); });
+}
+
+function clientTimelineHomeRange() {
+  if (typeof _dashGetCalendarWeekRange === 'function') return _dashGetCalendarWeekRange();
+  var now = new Date();
+  var day = now.getDay();
+  var diff = day === 0 ? -6 : 1 - day;
+  var start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+  var end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  function iso(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  return { startISO: iso(start), endISO: iso(end) };
+}
+
+function clientTimelineTaskClientKey(task) {
+  return task.client_key || task.clientKey || task._clientKey || task.meta_key || task.client_id || '';
+}
+
+function clientTimelineHomeTaskStatus(task) {
+  var pc = task.publish_config || {};
+  var entries = [];
+  if (pc.entries && Array.isArray(pc.entries)) entries = entries.concat(pc.entries);
+  ['feed','story','carrossel','reels'].forEach(function(fmt) {
+    if (pc[fmt] && Array.isArray(pc[fmt].entries)) entries = entries.concat(pc[fmt].entries);
+  });
+  if (entries.some(function(e) { return e.status === 'published'; }) || task.status === 'publicado') return 'published';
+  if (entries.some(function(e) { return e.status === 'scheduled' || e.status === 'queued'; }) || task.status === 'agendado' || task.status === 'agendar') return 'scheduled';
+  return 'open';
+}
+
+async function clientTimelineRefreshHome(force) {
+  if (_ctlHomeLoading) return;
+  if (_ctlHomeLoaded && !force) return;
+  _ctlHomeLoading = true;
+  clientTimelineRenderHome();
+  try {
+    var range = clientTimelineHomeRange();
+    var tasks = [];
+    if (typeof _sbQuery === 'function') {
+      tasks = await _sbQuery('content_tasks', {
+        select: 'id,group_id,name,status,due_date,publish_config,assignee,priority,created_at,updated_at',
+        filters: ['due_date=gte.' + range.startISO, 'due_date=lte.' + range.endISO],
+        order: 'due_date.asc',
+        limit: 500
+      }) || [];
+    }
+    var groupMap = {};
+    if (typeof _ensureGroupToClient === 'function') {
+      try { groupMap = await _ensureGroupToClient(); } catch(e) { groupMap = {}; }
+    }
+    _ctlHomeTasks = (tasks || []).map(function(t) {
+      var copy = Object.assign({}, t);
+      copy._clientKey = groupMap[t.group_id] || t.client_key || t.client_id || '';
+      return copy;
+    }).filter(function(t) {
+      return !t._clientKey || typeof ctIsClientOperational !== 'function' || ctIsClientOperational(t._clientKey);
+    });
+    _ctlHomeLoaded = true;
+  } catch(e) {
+    console.warn('[client-timeline-home] load failed:', e);
+  } finally {
+    _ctlHomeLoading = false;
+    if (!_ctlClientSlug) clientTimelineRenderHome();
+  }
+}
+
+function clientTimelineHomeSnapshot() {
+  var active = clientTimelineActiveClients();
+  var weekKey = (typeof _dashGetCurrentWeekKey === 'function') ? _dashGetCurrentWeekKey() : '';
+  var crono = { sent: 0, generated: 0, pending: 0, rows: [] };
+  active.forEach(function(c) {
+    var st = (typeof _dashGetStatus === 'function') ? _dashGetStatus(c.id, 'sched-weekly', weekKey) : { status: 0 };
+    var status = st && st.status ? st.status : 0;
+    if (status === 2) crono.sent++;
+    else if (status >= 1) crono.generated++;
+    else crono.pending++;
+    crono.rows.push(Object.assign({}, c, { cronoStatus: status, sent_date: st && st.sent_date }));
+  });
+  var tasks = _ctlHomeTasks || [];
+  var today = new Date();
+  var open = tasks.filter(function(t) { return !(typeof mtIsDoneStatus === 'function' ? mtIsDoneStatus(t.status) : /publicado|complete|completed|cancelado|cancelled/i.test(t.status || '')); });
+  var overdue = open.filter(function(t) {
+    if (!t.due_date) return false;
+    return new Date(t.due_date + 'T23:59:59') < today;
+  });
+  var noOwner = open.filter(function(t) { return !String(t.assignee || '').trim(); });
+  var approvals = open.filter(function(t) { return /aprovacao|aprovação|revisao|revisão/i.test(String(t.status || '')); });
+  var scheduled = tasks.filter(function(t) { return clientTimelineHomeTaskStatus(t) === 'scheduled'; });
+  var published = tasks.filter(function(t) { return clientTimelineHomeTaskStatus(t) === 'published'; });
+  var byClient = {};
+  function addRisk(key, weight, label) {
+    if (!key) return;
+    var meta = (typeof _metaClients !== 'undefined' && _metaClients[key]) ? _metaClients[key] : {};
+    if (!byClient[key]) byClient[key] = { key:key, name: meta.name || key, score:0, labels:[] };
+    byClient[key].score += weight;
+    if (label && byClient[key].labels.indexOf(label) < 0) byClient[key].labels.push(label);
+  }
+  crono.rows.forEach(function(c) { if (c.cronoStatus !== 2) addRisk(c.metaKey || c.id, c.cronoStatus >= 1 ? 2 : 4, c.cronoStatus >= 1 ? 'cronograma gerado' : 'cronograma pendente'); });
+  overdue.forEach(function(t) { addRisk(clientTimelineTaskClientKey(t), 5, 'task atrasada'); });
+  approvals.forEach(function(t) { addRisk(clientTimelineTaskClientKey(t), 3, 'aguarda aprovação'); });
+  noOwner.forEach(function(t) { addRisk(clientTimelineTaskClientKey(t), 2, 'sem responsável'); });
+  var critical = Object.keys(byClient).map(function(k) { return byClient[k]; }).sort(function(a,b) { return b.score - a.score || a.name.localeCompare(b.name, 'pt-BR'); });
+  return { active: active, weekKey: weekKey, range: clientTimelineHomeRange(), crono: crono, tasks: tasks, open: open, overdue: overdue, noOwner: noOwner, approvals: approvals, scheduled: scheduled, published: published, critical: critical };
+}
+
+function clientTimelineHomeClientRow(item, kind) {
+  var scoreCls = item.score >= 8 ? 'bad' : item.score >= 4 ? 'warn' : '';
+  var key = item.key || item.metaKey || item.id || '';
+  var label = (item.labels || []).slice(0, 2).join(' · ') || (kind || 'timeline');
+  var meta = (typeof _metaClients !== 'undefined' && _metaClients[key]) ? _metaClients[key] : {};
+  var tenant = meta.tenant === 'alpha' ? 'Alpha' : 'Starken';
+  return '<div class="ctl-home-row" onclick="clientTimelineSelectClient(' + ctlJsArg(key) + ')">' +
+    '<div class="ctl-home-score ' + scoreCls + '">' + ctlEsc(String(item.score || '!')) + '</div>' +
+    '<div><strong>' + ctlEsc(item.name || key || 'Cliente') + '</strong><small>' + ctlEsc(tenant + ' · ' + label) + '</small></div>' +
+    '<span class="mso" style="color:var(--text-muted)">chevron_right</span>' +
+  '</div>';
+}
+
+function clientTimelineHomeTaskRow(task) {
+  var key = clientTimelineTaskClientKey(task);
+  var meta = (typeof _metaClients !== 'undefined' && _metaClients[key]) ? _metaClients[key] : {};
+  var st = clientTimelineHomeTaskStatus(task);
+  var chipCls = st === 'published' ? 'ok' : st === 'scheduled' ? 'warn' : '';
+  var chip = st === 'published' ? 'Publicado' : st === 'scheduled' ? 'Agendado' : 'Aberto';
+  return '<div class="ctl-home-row" onclick="' + (key ? 'clientTimelineSelectClient(' + ctlJsArg(key) + ')' : 'ctOpenModal(' + ctlJsArg(task.id) + ')') + '">' +
+    '<div class="ctl-home-score ' + (st === 'published' ? '' : 'warn') + '"><span class="mso">' + (st === 'published' ? 'task_alt' : st === 'scheduled' ? 'calendar_today' : 'pending_actions') + '</span></div>' +
+    '<div><strong>' + ctlEsc(meta.name || key || 'Sem cliente') + '</strong><small>' + ctlEsc((task.due_date || 'sem data') + ' · ' + (task.name || 'Task')) + '</small></div>' +
+    '<span class="ctl-home-chip ' + chipCls + '">' + chip + '</span>' +
+  '</div>';
+}
+
+function clientTimelineRenderHome() {
+  var stats = document.getElementById('ctlStats');
+  var stages = document.getElementById('ctlStages');
+  var next = document.getElementById('ctlNextActions');
+  var ai = document.getElementById('ctlLurdinhaPanel');
+  var notes = document.getElementById('ctlNotes');
+  if (!stats || !stages || !next || !ai) return;
+  var snap = clientTimelineHomeSnapshot();
+  var active = snap.active;
+  var starkeCount = active.filter(function(c) { return c.tenant !== 'alpha'; }).length;
+  var alphaCount = active.filter(function(c) { return c.tenant === 'alpha'; }).length;
+  var weekPosts = snap.scheduled.length + snap.published.length;
+  stats.innerHTML = [
+    ['Clientes ativos', active.length, starkeCount + ' Starken · ' + alphaCount + ' Alpha'],
+    ['Cronos pendentes', snap.crono.pending, snap.crono.sent + '/' + active.length + ' enviados'],
+    ['Posts da semana', weekPosts, snap.published.length + ' pub · ' + snap.scheduled.length + ' agend'],
+    ['Aguardando aprovação', snap.approvals.length, 'revisão/cliente'],
+    ['Atrasados', snap.overdue.length, 'precisam ação'],
+    ['Sem responsável', snap.noOwner.length, 'atribuir dono'],
+  ].map(function(item) {
+    return '<div class="ctl-stat"><small>' + ctlEsc(item[2]) + '</small><strong>' + ctlEsc(item[1]) + '</strong><small>' + ctlEsc(item[0]) + '</small></div>';
+  }).join('');
+  var sentPct = active.length ? Math.round((snap.crono.sent / active.length) * 100) : 0;
+  var weeklyDone = snap.tasks.length ? Math.round(((snap.published.length + snap.scheduled.length) / snap.tasks.length) * 100) : 0;
+  var cronoRows = snap.crono.rows.filter(function(r) { return r.cronoStatus !== 2; }).slice(0, 8).map(function(r) {
+    var label = r.cronoStatus >= 1 ? 'Gerado, falta enviar' : 'Pendente';
+    var cls = r.cronoStatus >= 1 ? 'warn' : 'bad';
+    return '<div class="ctl-home-row" onclick="clientTimelineSelectClient(' + ctlJsArg(r.metaKey || r.id) + ')">' +
+      '<div class="ctl-home-score ' + cls + '">' + (r.cronoStatus >= 1 ? 'G' : '!') + '</div>' +
+      '<div><strong>' + ctlEsc(r.name) + '</strong><small>' + ctlEsc(r.company + ' · ' + label) + '</small></div>' +
+      '<span class="ctl-home-chip ' + cls + '">' + label + '</span>' +
+    '</div>';
+  }).join('') || '<div class="ctl-home-empty"><span class="mso">task_alt</span><br>Todos os cronogramas da semana foram enviados.</div>';
+  var criticalRows = snap.critical.slice(0, 8).map(function(c) { return clientTimelineHomeClientRow(c, 'atenção'); }).join('') || '<div class="ctl-home-empty">Nenhum cliente crítico neste momento.</div>';
+  var postRows = snap.tasks.slice().sort(function(a,b) { return String(a.due_date || '').localeCompare(String(b.due_date || '')); }).slice(0, 8).map(clientTimelineHomeTaskRow).join('') || '<div class="ctl-home-empty">' + (_ctlHomeLoading ? 'Carregando posts da semana...' : 'Nenhum post mapeado para esta semana.') + '</div>';
+  stages.innerHTML = '<div class="ctl-home-grid">' +
+    '<section class="ctl-home-card"><h3><span class="mso">monitoring</span> Saúde operacional</h3><div class="ctl-home-progress">' +
+      '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Cronogramas enviados</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + sentPct + '%"></div></div><div class="ctl-home-progress-meta">' + snap.crono.sent + '/' + active.length + '</div></div>' +
+      '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Entrega semanal</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + weeklyDone + '%"></div></div><div class="ctl-home-progress-meta">' + (snap.published.length + snap.scheduled.length) + '/' + snap.tasks.length + '</div></div>' +
+      '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Aprovações abertas</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + Math.min(100, snap.approvals.length * 12) + '%;background:linear-gradient(90deg,#fbbf24,#ef4444)"></div></div><div class="ctl-home-progress-meta">' + snap.approvals.length + '</div></div>' +
+    '</div></section>' +
+    '<section class="ctl-home-card"><h3><span class="mso">priority_high</span> Clientes que precisam de atenção</h3><div class="ctl-home-list">' + criticalRows + '</div></section>' +
+    '<section class="ctl-home-card"><h3><span class="mso">calendar_month</span> Cronogramas da semana</h3><div class="ctl-home-list">' + cronoRows + '</div></section>' +
+    '<section class="ctl-home-card"><h3><span class="mso">event_available</span> Agendamentos e publicações</h3><div class="ctl-home-list">' + postRows + '</div></section>' +
+  '</div>';
+  var actions = [];
+  snap.crono.rows.filter(function(r) { return r.cronoStatus !== 2; }).slice(0, 4).forEach(function(r) { actions.push({ title:'Cronograma · ' + r.name, text:(r.cronoStatus >= 1 ? 'Enviar cronograma gerado' : 'Gerar cronograma pendente'), key:r.metaKey || r.id }); });
+  snap.overdue.slice(0, 3).forEach(function(t) { actions.push({ title:t.name || 'Task atrasada', text:(t.assignee || 'Sem responsável') + ' · ' + (t.due_date || 'sem data'), key:clientTimelineTaskClientKey(t) }); });
+  next.innerHTML = actions.length ? actions.slice(0, 8).map(function(a) {
+    return '<div class="ctl-next-item" onclick="clientTimelineSelectClient(' + ctlJsArg(a.key) + ')" style="cursor:pointer"><strong>' + ctlEsc(a.title) + '</strong><small>' + ctlEsc(a.text) + '</small></div>';
+  }).join('') : '<div class="ctl-empty">Nenhuma ação crítica agora.</div>';
+  ai.innerHTML = '<div class="ctl-next-item"><strong>Visão geral · ' + (snap.overdue.length ? 'Atenção' : 'OK') + '</strong><small>' + ctlEsc('Há ' + snap.crono.pending + ' cronogramas pendentes, ' + snap.overdue.length + ' tasks atrasadas e ' + snap.approvals.length + ' aprovações abertas.') + '</small></div>' +
+    '<button class="ctl-btn primary" style="width:100%;margin-top:8px" onclick="clientTimelineHomeAnalyze()">Gerar análise geral</button>';
+  if (notes) notes.innerHTML = '<div class="ctl-empty" style="padding:12px">Selecione um cliente para notas rápidas individuais.</div>';
+}
+
+function clientTimelineHomeAnalyze() {
+  var snap = clientTimelineHomeSnapshot();
+  var msg = 'Lurdinha - visão geral da operação\n\n' +
+    '- Clientes ativos: ' + snap.active.length + '\n' +
+    '- Cronogramas pendentes: ' + snap.crono.pending + '\n' +
+    '- Cronogramas enviados: ' + snap.crono.sent + '/' + snap.active.length + '\n' +
+    '- Posts da semana: ' + snap.tasks.length + ' (' + snap.published.length + ' publicados, ' + snap.scheduled.length + ' agendados)\n' +
+    '- Tasks atrasadas: ' + snap.overdue.length + '\n' +
+    '- Aprovações abertas: ' + snap.approvals.length + '\n' +
+    '- Sem responsável: ' + snap.noOwner.length + '\n\n' +
+    'Prioridade sugerida: resolver cronogramas pendentes, cobrar responsáveis de tasks atrasadas e fechar aprovações antes de abrir novas demandas.';
+  try { navigator.clipboard && navigator.clipboard.writeText(msg); } catch(e) {}
+  if (typeof showToast === 'function') showToast('Análise geral da timeline copiada');
+  return msg;
+}
+
 function clientTimelineRenderEmpty(message) {
   var stats = document.getElementById('ctlStats');
   var stages = document.getElementById('ctlStages');
@@ -30077,7 +30368,7 @@ function clientTimelineRender() {
   var statsEl = document.getElementById('ctlStats');
   var nextEl = document.getElementById('ctlNextActions');
   if (!stagesEl || !statsEl || !nextEl) return;
-  if (!_ctlClientSlug) return clientTimelineRenderEmpty('Selecione um cliente para montar a timeline operacional.');
+  if (!_ctlClientSlug) return clientTimelineRenderHome();
 
   var tasks = _ctlTasks.filter(clientTimelineInRange);
   var byStage = {};
@@ -30197,7 +30488,7 @@ function clientTimelineRenderLurdinha(tasks, byStage) {
 }
 
 function clientTimelineLurdinhaAnalyze() {
-  if (!_ctlClientSlug) return showToast('Selecione um cliente para a Lurdinha analisar');
+  if (!_ctlClientSlug) return clientTimelineHomeAnalyze();
   var tasks = _ctlTasks.filter(clientTimelineInRange);
   var byStage = {};
   CTL_STAGES.forEach(function(stage) { byStage[stage.key] = []; });
