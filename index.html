@@ -7289,6 +7289,7 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
                 <button class="meta-bi-period-btn active" data-preset="last_7d" onclick="metaBiSetPeriod('last_7d')" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card);font-size:0.75rem;cursor:pointer;transition:all 0.2s;font-family:inherit">7 dias</button>
                 <button class="meta-bi-period-btn" data-preset="this_month" onclick="metaBiSetPeriod('this_month')" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card);font-size:0.75rem;cursor:pointer;transition:all 0.2s;font-family:inherit">Este Mês</button>
                 <button class="meta-bi-period-btn" data-preset="last_month" onclick="metaBiSetPeriod('last_month')" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card);font-size:0.75rem;cursor:pointer;transition:all 0.2s;font-family:inherit">Mês Anterior</button>
+                <button class="meta-bi-period-btn" data-preset="last_90d" onclick="metaBiSetPeriod('last_90d')" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card);font-size:0.75rem;cursor:pointer;transition:all 0.2s;font-family:inherit">3 Meses</button>
                 <button class="meta-bi-period-btn" data-preset="custom" onclick="metaBiToggleCustomDates()" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--card);font-size:0.75rem;cursor:pointer;transition:all 0.2s;font-family:inherit">Personalizado</button>
               </div>
             </div>
@@ -7300,6 +7301,7 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
               <input type="date" id="metaBiDateEnd" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;background:var(--card);color:var(--text);font-family:inherit">
               <button onclick="metaBiApplyCustomDates()" style="padding:6px 16px;border:none;border-radius:6px;background:var(--starken);color:#fff;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.2s">Aplicar</button>
             </div>
+            <div id="metaBiPeriodDebug" style="display:none;margin-bottom:16px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text-secondary);font-size:0.78rem;line-height:1.45"></div>
 
             <!-- KPI Cards (6-column consolidado) -->
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px" id="metaBiDashboardKpis">
@@ -20110,7 +20112,9 @@ var _metaBiState = {
   clientsData: {}, // { "client-key": { spend, revenue, conversions, campaigns: [...] } }
   allClients: {}, // { "client-key": { name, tenant, ... } }
   dashboardData: null,
-  charts: {}
+  charts: {},
+  fetchSeq: 0,
+  lastFetchMeta: null
 };
 
 function metaBiInit() {
@@ -20199,6 +20203,10 @@ async function metaBiDrillDown(clientKey) {
   if (!client) return;
 
   _metaBiState.currentClient = clientKey;
+  _metaBiState.currentPeriod = 'last_7d';
+  _metaBiState.customDateStart = null;
+  _metaBiState.customDateEnd = null;
+  _metaBiState.lastFetchMeta = null;
 
   // Hide grid, show dashboard
   document.getElementById('metaBiGridView').style.display = 'none';
@@ -20212,6 +20220,9 @@ async function metaBiDrillDown(clientKey) {
     btn.classList.remove('active');
   });
   document.querySelector('[data-preset="last_7d"]').classList.add('active');
+  var customPanel = document.getElementById('metaBiCustomDates');
+  if (customPanel) customPanel.style.display = 'none';
+  metaBiRenderPeriodDebug(null);
 
   // Show loading state
   document.getElementById('metaBiDashboardCampaigns').innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-secondary);font-size:0.85rem">⏳ Carregando dados...</div>';
@@ -20257,6 +20268,53 @@ function metaBiSetTemplate(template) {
   }
 }
 
+function metaBiPeriodLabel(preset) {
+  if (preset === 'last_7d') return '7 dias';
+  if (preset === 'this_month') return 'Este mês';
+  if (preset === 'last_month') return 'Mês anterior';
+  if (preset === 'last_90d' || preset === 'last_3m') return '3 meses';
+  if (preset === 'custom') return 'Personalizado';
+  return preset || '—';
+}
+
+function metaBiSetLoading(message) {
+  var campaigns = document.getElementById('metaBiDashboardCampaigns');
+  if (campaigns) {
+    campaigns.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-secondary);font-size:0.85rem">⏳ ' + esc(message || 'Carregando dados...') + '</div>';
+  }
+  var kpis = document.getElementById('metaBiDashboardKpis');
+  if (kpis) {
+    kpis.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:18px;color:var(--text-secondary);border:1px solid var(--border);border-radius:10px;background:var(--card)">Atualizando métricas do período...</div>';
+  }
+}
+
+function metaBiRenderPeriodDebug(info) {
+  var el = document.getElementById('metaBiPeriodDebug');
+  if (!el) return;
+  if (!info) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  el.style.display = 'block';
+  var period = info.period || {};
+  var clientRows = info.clientRows || 0;
+  var tenantRows = info.tenantRows || 0;
+  var accounts = info.accountsChecked || 0;
+  var clientName = info.clientName || 'cliente';
+  var base = '<strong style="color:var(--text)">Diagnóstico do período:</strong> '
+    + metaBiPeriodLabel(info.preset) + ' · ' + (period.since || '—') + ' até ' + (period.until || '—')
+    + ' · Meta retornou ' + tenantRows + ' campanha(s) na consulta, ' + clientRows + ' deste cliente'
+    + (accounts ? ' · ' + accounts + ' conta(s) consultada(s)' : '') + '.';
+  var hint = '';
+  if (tenantRows > 0 && clientRows === 0) {
+    hint = '<div style="margin-top:5px;color:#f59e0b">A API puxou dados do período, mas não encontrou campanhas para ' + esc(clientName) + '. Provável causa: a conta de anúncio desse cliente não teve entrega no intervalo ou o ID da conta está diferente da configuração.</div>';
+  } else if (tenantRows === 0) {
+    hint = '<div style="margin-top:5px;color:#f59e0b">A Meta não retornou campanhas para nenhuma conta do tenant nesse intervalo. Pode ser período sem entrega ou limite/erro da API.</div>';
+  }
+  el.innerHTML = base + hint;
+}
+
 function metaBiSetPeriod(preset) {
   _metaBiState.currentPeriod = preset;
 
@@ -20264,7 +20322,8 @@ function metaBiSetPeriod(preset) {
   document.querySelectorAll('.meta-bi-period-btn').forEach(function(btn) {
     btn.classList.remove('active');
   });
-  document.querySelector('[data-preset="' + preset + '"]').classList.add('active');
+  var activePeriodBtn = document.querySelector('[data-preset="' + preset + '"]');
+  if (activePeriodBtn) activePeriodBtn.classList.add('active');
 
   // Hide custom dates if switching to preset
   if (preset !== 'custom') {
@@ -20272,6 +20331,7 @@ function metaBiSetPeriod(preset) {
   }
 
   // Refetch data
+  metaBiSetLoading('Buscando ' + metaBiPeriodLabel(preset) + ' na Meta...');
   metaBiFetchDashboardData(_metaBiState.currentClient, preset);
 }
 
@@ -20296,9 +20356,14 @@ function metaBiApplyCustomDates() {
   var start = document.getElementById('metaBiDateStart').value;
   var end = document.getElementById('metaBiDateEnd').value;
   if (!start || !end) { alert('Selecione as duas datas'); return; }
+  if (start > end) { alert('A data inicial não pode ser maior que a data final'); return; }
   _metaBiState.currentPeriod = 'custom';
   _metaBiState.customDateStart = start;
   _metaBiState.customDateEnd = end;
+  document.querySelectorAll('.meta-bi-period-btn').forEach(function(btn) { btn.classList.remove('active'); });
+  var customBtn = document.querySelector('[data-preset="custom"]');
+  if (customBtn) customBtn.classList.add('active');
+  metaBiSetLoading('Buscando período personalizado na Meta...');
   metaBiFetchDashboardData(_metaBiState.currentClient, 'custom');
 }
 
@@ -20553,17 +20618,40 @@ async function metaBiFetchDashboardData(clientKey, preset) {
   var client = _metaBiState.allClients[clientKey];
   if (!client) return;
 
+  var requestSeq = ++_metaBiState.fetchSeq;
+  var timeoutId = null;
   try {
-    // Fetch insights for this client's ad account
-    var url = metaApiBase() + '/api/meta/insights?tenant=' + client.tenant + '&preset=' + preset + '&level=campaign';
+    // Fetch insights scoped to the selected client. This avoids loading every tenant account
+    // before filtering, which made period changes feel frozen on larger tenants.
+    var url = metaApiBase() + '/api/meta/insights?client=' + encodeURIComponent(clientKey)
+      + '&tenant=' + encodeURIComponent(client.tenant || '')
+      + '&preset=' + encodeURIComponent(preset)
+      + '&level=campaign';
     if (preset === 'custom' && _metaBiState.customDateStart && _metaBiState.customDateEnd) {
-      url += '&date_start=' + _metaBiState.customDateStart + '&date_end=' + _metaBiState.customDateEnd;
+      url += '&date_start=' + encodeURIComponent(_metaBiState.customDateStart) + '&date_end=' + encodeURIComponent(_metaBiState.customDateEnd);
     }
-    var res = await fetch(url);
+    var controller = window.AbortController ? new AbortController() : null;
+    if (controller) {
+      timeoutId = setTimeout(function() { controller.abort(); }, 45000);
+    }
+    var res = await fetch(url, controller ? { signal: controller.signal } : undefined);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
     var json = await res.json();
+    if (requestSeq !== _metaBiState.fetchSeq) return;
 
-    if (json.error) {
-      alert('Erro: ' + json.message);
+    if (!res.ok || json.error) {
+      metaBiRenderPeriodDebug({
+        preset: preset,
+        period: json.period || {},
+        clientName: client.name || clientKey,
+        tenantRows: 0,
+        clientRows: 0,
+        accountsChecked: 0
+      });
+      document.getElementById('metaBiDashboardCampaigns').innerHTML = '<div style="text-align:center;padding:30px;color:#f59e0b;font-size:0.85rem">Erro ao buscar dados da Meta: ' + esc(json.message || json.error || res.statusText) + '</div>';
       return;
     }
 
@@ -20571,6 +20659,14 @@ async function metaBiFetchDashboardData(clientKey, preset) {
     var clientAdAccount = client.adAccountId || '';
     if (!clientAdAccount) {
       // No ad account configured — show warning instead of all data
+      metaBiRenderPeriodDebug({
+        preset: preset,
+        period: json.period || {},
+        clientName: client.name || clientKey,
+        tenantRows: (json.data || []).length,
+        clientRows: 0,
+        accountsChecked: json.accounts_checked || 0
+      });
       document.getElementById('metaBiDashboardCampaigns').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);font-size:0.9rem">'
         + '<div style="font-size:2rem;margin-bottom:12px"><span class="mso">warning</span></div>'
         + '<div style="font-weight:700;margin-bottom:6px;color:var(--text)">Conta de anúncios não configurada</div>'
@@ -20581,6 +20677,15 @@ async function metaBiFetchDashboardData(clientKey, preset) {
     var filtered = (json.data || []).filter(function(row) {
       return row.ad_account_id === clientAdAccount;
     });
+    _metaBiState.lastFetchMeta = {
+      preset: preset,
+      period: json.period || {},
+      clientName: client.name || clientKey,
+      tenantRows: (json.data || []).length,
+      clientRows: filtered.length,
+      accountsChecked: json.accounts_checked || 0,
+      adAccountId: clientAdAccount
+    };
     var rows = filtered.map(function(row) {
       var purchases = metaBiExtractAction(row.actions, ['omni_purchase','purchase','offsite_conversion.fb_pixel_purchase']);
       var revenue = metaBiExtractAction(row.action_values, ['omni_purchase','purchase','offsite_conversion.fb_pixel_purchase']);
@@ -20622,6 +20727,7 @@ async function metaBiFetchDashboardData(clientKey, preset) {
     });
 
     _metaBiState.dashboardData = rows;
+    metaBiRenderPeriodDebug(_metaBiState.lastFetchMeta);
 
     // Render KPIs
     metaBiRenderDashboardKpis(rows);
@@ -20639,7 +20745,23 @@ async function metaBiFetchDashboardData(clientKey, preset) {
     metaBiLoadSistemaData();
 
   } catch (e) {
-    alert('Erro ao carregar dados: ' + e.message);
+    if (requestSeq !== _metaBiState.fetchSeq) return;
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    metaBiRenderPeriodDebug({
+      preset: preset,
+      period: {},
+      clientName: client.name || clientKey,
+      tenantRows: 0,
+      clientRows: 0,
+      accountsChecked: 0
+    });
+    var errorMessage = e && e.name === 'AbortError'
+      ? 'A API demorou mais de 45s para responder. Tente novamente ou use um período menor.'
+      : (e.message || e);
+    document.getElementById('metaBiDashboardCampaigns').innerHTML = '<div style="text-align:center;padding:30px;color:#f59e0b;font-size:0.85rem">Erro ao carregar dados: ' + esc(errorMessage) + '</div>';
   }
 }
 

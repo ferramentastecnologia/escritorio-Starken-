@@ -2,12 +2,14 @@
  * /api/meta/insights — Extração de métricas de campanhas (BI)
  *
  * GET ?tenant=starken|alpha
- *     &preset=last_7d|this_month|last_month|custom
+ *     ou ?client=arena-gourmet (consulta somente a conta do cliente)
+ *     &preset=last_7d|this_month|last_month|last_90d|custom
  *     &date_start=YYYY-MM-DD (se preset=custom)
  *     &date_end=YYYY-MM-DD   (se preset=custom)
  *     &level=account|campaign|adset|ad (default: campaign)
  *
- * Consulta todas as ad accounts do tenant e agrega resultados
+ * Consulta as ad accounts do tenant ou, quando client=... for informado,
+ * somente a conta do cliente selecionado.
  */
 
 const { graphGet } = require('./_lib/graph');
@@ -32,6 +34,12 @@ function resolveDateRange(preset, dateStart, dateEnd) {
       const until = new Date(today.getFullYear(), today.getMonth(), 0);
       return { since: fmt(since), until: fmt(until) };
     }
+    case 'last_90d':
+    case 'last_3m': {
+      const since = new Date(today);
+      since.setDate(since.getDate() - 90);
+      return { since: fmt(since), until: fmt(today) };
+    }
     case 'custom': {
       if (!dateStart || !dateEnd) {
         throw { error: true, code: 'MISSING_PARAM', message: 'date_start e date_end são obrigatórios para preset=custom' };
@@ -39,7 +47,7 @@ function resolveDateRange(preset, dateStart, dateEnd) {
       return { since: dateStart, until: dateEnd };
     }
     default:
-      throw { error: true, code: 'MISSING_PARAM', message: `Preset "${preset}" inválido. Use: last_7d, this_month, last_month, custom` };
+      throw { error: true, code: 'MISSING_PARAM', message: `Preset "${preset}" inválido. Use: last_7d, this_month, last_month, last_90d, custom` };
   }
 }
 
@@ -66,6 +74,7 @@ module.exports = async function handler(req, res) {
 
   const preset = req.query.preset || 'last_7d';
   const level = req.query.level || 'campaign';
+  const requestedClient = req.query.client || null;
 
   let dateRange;
   try {
@@ -118,8 +127,12 @@ module.exports = async function handler(req, res) {
     const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
 
     return res.status(200).json({
-      tenant: tenant.key,
+      tenant: tenant.tenant || tenant.key,
+      client: requestedClient ? tenant.key : null,
+      scope: requestedClient ? 'client' : 'tenant',
+      preset,
       period: dateRange,
+      accounts_checked: tenant.adAccountIds.length,
       data: allData,
       summary: {
         total_spend: totalSpend.toFixed(2),
