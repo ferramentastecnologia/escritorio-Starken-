@@ -11,7 +11,7 @@
 (function() {
   var OFFICE_GAME_PATH = '/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=4';
   window.STARKEN_OFFICE_GAME_PATH = OFFICE_GAME_PATH;
-  window.STARKEN_OS_BUILD = '20260514-1638-cronograma-flow-safe';
+  window.STARKEN_OS_BUILD = '20260514-1648-cronograma-dashboard-timeline';
 
   // Se por qualquer cache/clique antigo o Starken OS for carregado dentro do proprio iframe,
   // troca imediatamente para o escritorio real. Isso evita o efeito "menu dentro de menu".
@@ -4512,6 +4512,7 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
 .ctl-home-score { width: 42px; height: 42px; border-radius: 12px; display:flex; align-items:center; justify-content:center; font-weight:950; background: rgba(70,238,205,.13); color: var(--starken); border:1px solid rgba(70,238,205,.25); }
 .ctl-home-score.warn { background: rgba(251,191,36,.12); color:#fbbf24; border-color: rgba(251,191,36,.28); }
 .ctl-home-score.bad { background: rgba(239,68,68,.12); color:#f87171; border-color: rgba(239,68,68,.28); }
+.ctl-home-logo { width:42px; height:42px; border-radius:12px; flex-shrink:0; font-size:.72rem; border:1px solid rgba(70,238,205,.22); box-shadow:0 0 0 1px rgba(0,0,0,.18) inset; }
 .ctl-home-chip { display:inline-flex; align-items:center; gap:4px; border-radius:999px; padding:3px 7px; font-size:.68rem; font-weight:900; border:1px solid var(--border); color:var(--text-secondary); background:var(--card); }
 .ctl-home-chip:is(button,a) { cursor:pointer; font-family:inherit; line-height:1; white-space:nowrap; }
 .ctl-home-chip.ok { color:#46eecd; border-color:rgba(70,238,205,.25); background:rgba(70,238,205,.08); }
@@ -9904,17 +9905,32 @@ if (typeof _metaClients === 'undefined') var _metaClients = {};
 if (typeof _cronogramaStatusCache === 'undefined') var _cronogramaStatusCache = {};
 function findMetaClientKey(clientName, tenant) {
   if (!_metaClients || Object.keys(_metaClients).length === 0) return null;
-  var nameLower = (clientName || '').toLowerCase().trim();
+  function norm(v) {
+    return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' e ').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+  var nameLower = norm(clientName);
   var found = null;
   Object.entries(_metaClients).forEach(function(entry) {
     var key = entry[0];
     var mc = entry[1];
-    if (mc.tenant !== tenant) return;
-    var mcName = (mc.name || key).toLowerCase().trim();
-    if (mcName === nameLower || mcName.includes(nameLower) || nameLower.includes(mcName)) {
+    if (tenant && mc.tenant !== tenant) return;
+    var mcName = norm(mc.name || key);
+    var keyName = norm(key);
+    if (mcName === nameLower || keyName === nameLower || mcName.includes(nameLower) || nameLower.includes(mcName) || keyName.includes(nameLower) || nameLower.includes(keyName)) {
       found = key;
     }
   });
+  if (!found && tenant) {
+    Object.entries(_metaClients).forEach(function(entry) {
+      var key = entry[0];
+      var mc = entry[1];
+      var mcName = norm(mc.name || key);
+      var keyName = norm(key);
+      if (mcName === nameLower || keyName === nameLower || mcName.includes(nameLower) || nameLower.includes(mcName) || keyName.includes(nameLower) || nameLower.includes(keyName)) {
+        found = key;
+      }
+    });
+  }
   return found;
 }
 
@@ -20692,17 +20708,32 @@ function metaBiGeneratePdfReport() {
 
 function findMetaClientKey(clientName, tenant) {
   if (!_metaClients) return null;
-  var nameLower = (clientName || '').toLowerCase().trim();
+  function norm(v) {
+    return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' e ').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+  var nameLower = norm(clientName);
   var found = null;
   Object.entries(_metaClients).forEach(function(entry) {
     var key = entry[0];
     var mc = entry[1];
-    if (mc.tenant !== tenant) return;
-    var mcName = (mc.name || key).toLowerCase().trim();
-    if (mcName === nameLower || mcName.includes(nameLower) || nameLower.includes(mcName)) {
+    if (tenant && mc.tenant !== tenant) return;
+    var mcName = norm(mc.name || key);
+    var keyName = norm(key);
+    if (mcName === nameLower || keyName === nameLower || mcName.includes(nameLower) || nameLower.includes(mcName) || keyName.includes(nameLower) || nameLower.includes(keyName)) {
       found = key;
     }
   });
+  if (!found && tenant) {
+    Object.entries(_metaClients).forEach(function(entry) {
+      var key = entry[0];
+      var mc = entry[1];
+      var mcName = norm(mc.name || key);
+      var keyName = norm(key);
+      if (mcName === nameLower || keyName === nameLower || mcName.includes(nameLower) || nameLower.includes(mcName) || keyName.includes(nameLower) || nameLower.includes(keyName)) {
+        found = key;
+      }
+    });
+  }
   return found;
 }
 
@@ -30797,8 +30828,11 @@ function clientTimelineRenderHome() {
     } else if (r.metaKey) {
       actions += '<button class="ctl-home-chip bad" onclick="event.stopPropagation();cronogramaFromSchedule(' + ctlJsArg(r.metaKey) + ',' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')">Gerar</button>';
     }
-    return '<div class="ctl-home-row" onclick="clientTimelineSelectClient(' + ctlJsArg(r.metaKey || r.id) + ')">' +
-      '<div class="ctl-home-score ' + cls + '">' + (r.cronoStatus >= 1 ? 'G' : '!') + '</div>' +
+    var rowClick = r.metaKey
+      ? 'cronogramaFromSchedule(' + ctlJsArg(r.metaKey) + ',' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')'
+      : 'clientTimelineSelectClient(' + ctlJsArg(r.id) + ')';
+    return '<div class="ctl-home-row" onclick="' + rowClick + '">' +
+      clientLogoAvatarHtml({ slug: r.metaKey || r.id, name: r.name, logo_url: r.logo_url || r.logoUrl || r.logo }, 'ctl-home-logo') +
       '<div><strong>' + ctlEsc(r.name) + '</strong><small>' + ctlEsc(r.company + ' · ' + label) + '</small></div>' +
       '<div style="display:flex;align-items:center;gap:6px;margin-left:auto">' + actions + '<span class="ctl-home-chip ' + cls + '">' + label + '</span></div>' +
     '</div>';
@@ -33543,16 +33577,18 @@ async function cronogramaFromSchedule(clientSlug, clientId, type, periodKey) {
     ]);
 
     // Store state with schedule context for status update after download
-    _cronoState = {
-      tasks: allTasks, clientName: clientName, clientLogo: clientLogo,
-      tenant: tenant, clientId: clientSlug,
-      scheduleContext: { clientId: clientId, type: type, periodKey: periodKey }
-    };
-    cronogramaShowModal();
-  } catch(err) {
-    console.error('Cronograma from schedule error:', err);
-    alert('Erro ao carregar dados: ' + err.message);
-  }
+	    _cronoState = {
+	      tasks: allTasks, clientName: clientName, clientLogo: clientLogo,
+	      tenant: tenant, clientId: clientSlug,
+	      scheduleContext: { clientId: clientId, type: type, periodKey: periodKey }
+	    };
+	    cronogramaShowModal();
+	    _cronoLoading = false;
+	  } catch(err) {
+	    _cronoLoading = false;
+	    console.error('Cronograma from schedule error:', err);
+	    alert('Erro ao carregar dados: ' + err.message);
+	  }
 }
 
 // Main: open modal with task selection
@@ -33804,20 +33840,9 @@ function cronogramaPreview() {
   // Store pages globally for title editing
   window._cronoPages = pages;
 
-  pages.forEach(function(pageHtml, i) {
-    // Extract current title from the page header
-    var titleMatch = pageHtml.match(/font-weight:800;color:#fff;text-transform:uppercase[^>]*>([^<]+)/);
-    var currentTitle = titleMatch ? titleMatch[1] : '';
-
-    cards += '<div style="width:' + cardW + 'px;position:relative">'
-      // Editable title bar (only for post pages with headers)
-      + (currentTitle ? '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">'
-        + '<input type="text" id="cronoTitle_' + i + '" value="' + currentTitle.replace(/"/g, '&quot;') + '" '
-        + 'style="flex:1;font-size:10px;font-weight:700;padding:4px 8px;border:1.5px solid var(--border,#ddd);border-radius:6px;background:var(--card,#fff);color:var(--text,#333);text-transform:uppercase;letter-spacing:0.5px;font-family:inherit">'
-        + '<button onclick="cronogramaEditTitle(' + i + ',document.getElementById(\'cronoTitle_' + i + '\').value);this.textContent=\'<span class="mso mso-fill">check_circle</span>\';setTimeout(function(){this.textContent=\'<span class="mso">save</span>\';}.bind(this),1500)" '
-        + 'style="padding:3px 8px;border:1.5px solid var(--brand,#3b82f6);border-radius:6px;background:var(--brand,#3b82f6);color:#fff;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap" title="Salvar título"><span class="mso">save</span></button>'
-        + '</div>' : '')
-      + '<div id="cronoPageCard_' + i + '" style="width:' + cardW + 'px;height:' + cardH + 'px;overflow:hidden;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,0.18);position:relative;background:#b5aa9a">'
+	  pages.forEach(function(pageHtml, i) {
+	    cards += '<div style="width:' + cardW + 'px;position:relative">'
+	      + '<div id="cronoPageCard_' + i + '" style="width:' + cardW + 'px;height:' + cardH + 'px;overflow:hidden;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,0.18);position:relative;background:#b5aa9a">'
       + '<div style="transform:scale(' + scale + ');transform-origin:top left;width:960px;height:680px;pointer-events:none;font-family:Inter,-apple-system,sans-serif">' + pageHtml + '</div>'
       + '<div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:3px 14px;border-radius:10px;font-weight:600">' + (i + 1) + ' / ' + total + '</div>'
       + '</div></div>';
