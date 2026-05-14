@@ -11,7 +11,7 @@
 (function() {
   var OFFICE_GAME_PATH = '/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=4';
   window.STARKEN_OFFICE_GAME_PATH = OFFICE_GAME_PATH;
-  window.STARKEN_OS_BUILD = '20260514-0055-schedule-cache-guard';
+  window.STARKEN_OS_BUILD = '20260514-0115-publish-alert-guard';
 
   // Se por qualquer cache/clique antigo o Starken OS for carregado dentro do proprio iframe,
   // troca imediatamente para o escritorio real. Isso evita o efeito "menu dentro de menu".
@@ -9954,6 +9954,7 @@ document.addEventListener('DOMContentLoaded', function() {
   let _queueLastErrorAt = 0;    // timestamp of last system-level error shown (throttle alerts)
   const PUBLISH_ALERT_REPEAT_MS = 2 * 60 * 60 * 1000;
   const PUBLISH_ALERT_MAX_TOASTS = 4;
+  const PUBLISH_ALERT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 
   function publishFailureAlertKey(item) {
     const platform = String(item && item.platform || '').toLowerCase();
@@ -9970,6 +9971,27 @@ document.addEventListener('DOMContentLoaded', function() {
     return Date.now() - ts < intervalMs;
   }
 
+  function publishAlertTimestamp(item) {
+    if (!item) return null;
+    if (item.status === 'SCHEDULED' && item.scheduled_for) {
+      const scheduledTs = new Date(item.scheduled_for).getTime();
+      if (Number.isFinite(scheduledTs)) return scheduledTs;
+    }
+    const fields = [item.created_at, item.updated_at, item.published_at, item.scheduled_for];
+    for (let i = 0; i < fields.length; i++) {
+      if (!fields[i]) continue;
+      const t = new Date(fields[i]).getTime();
+      if (Number.isFinite(t)) return t;
+    }
+    return null;
+  }
+
+  function isRecentPublishAlert(item) {
+    const ts = publishAlertTimestamp(item);
+    if (!ts) return false;
+    return Date.now() - ts <= PUBLISH_ALERT_LOOKBACK_MS;
+  }
+
   async function processQueueAndCheckAlerts() {
     if (_queueProcessing) return; // already running, skip
     _queueProcessing = true;
@@ -9982,13 +10004,15 @@ document.addEventListener('DOMContentLoaded', function() {
       // 2. Verifica alertas — busca FAILED e QUEUED atrasados (history + queue direta)
       const histRes = await fetch(metaApiBase() + '/api/meta/publish?limit=20');
       const histData = await histRes.json();
-      var items = histData.history || [];
+      var items = (histData.history || []).filter(isRecentPublishAlert);
       // Também verifica publish_queue diretamente (FAILED recentes não gravados em history)
       try {
         // _sbQuery returns raw array (queryProxy format)
-        var queueRows = await _sbQuery('publish_queue', { select: '*', filters: ['status=eq.FAILED'], order: 'created_at.desc', limit: 20 });
+        var alertCutoffIso = new Date(Date.now() - PUBLISH_ALERT_LOOKBACK_MS).toISOString();
+        var queueRows = await _sbQuery('publish_queue', { select: '*', filters: ['status=eq.FAILED', 'created_at=gte.' + alertCutoffIso], order: 'created_at.desc', limit: 20 });
         if (Array.isArray(queueRows)) {
           queueRows.forEach(function(q) {
+            if (!isRecentPublishAlert(q)) return;
             if (!items.find(function(h) { return h.task_id && h.task_id === q.task_id && h.platform === q.platform && h.status === 'FAILED'; })) {
               items.push({ id: q.id, post_id: q.id, status: 'FAILED', platform: q.platform, client_key: q.client_key, client_name: q.client_name, error_message: q.error_message, scheduled_for: q.scheduled_for, task_id: q.task_id, created_at: q.created_at });
             }
@@ -35515,6 +35539,11 @@ async function ctPublishFormat(options) {
     if (!datetime) return alert('Selecione data e hora para agendamento');
     var scheduleDate = new Date(datetime);
     if (isNaN(scheduleDate.getTime())) return alert('Data e hora de agendamento inválidas');
+    var hasDirectFacebookSchedule = _ctFmtPlatforms.includes('fb') && fmt !== 'story';
+    var minFacebookScheduleMs = 15 * 60 * 1000;
+    if (hasDirectFacebookSchedule && scheduleDate.getTime() - Date.now() < minFacebookScheduleMs) {
+      return alert('Facebook precisa de pelo menos 15 minutos de antecedência para agendar com segurança. Escolha um horário mais distante ou publique agora.');
+    }
   }
   console.log('[ctPublishFormat]', { fmt: fmt, mode: mode, datetime: datetime, source: publishOptions.source || 'main' });
 

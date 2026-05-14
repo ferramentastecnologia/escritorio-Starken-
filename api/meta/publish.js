@@ -30,6 +30,29 @@ function encodeImageUrl(urls) {
   return JSON.stringify(urls);
 }
 
+const FB_SCHEDULE_MIN_LEAD_SECONDS = 15 * 60;
+
+function facebookScheduleValidation(scheduledPublishTime) {
+  if (!scheduledPublishTime) return null;
+  const ts = Number(scheduledPublishTime);
+  if (!Number.isFinite(ts)) {
+    return {
+      error: true,
+      code: 'INVALID_SCHEDULE_TIME',
+      message: 'Data e hora de agendamento inválidas para Facebook.',
+    };
+  }
+  const earliest = Math.ceil(Date.now() / 1000) + FB_SCHEDULE_MIN_LEAD_SECONDS;
+  if (ts < earliest) {
+    return {
+      error: true,
+      code: 'FACEBOOK_SCHEDULE_TOO_SOON',
+      message: 'Facebook precisa de pelo menos 15 minutos de antecedência para agendar com segurança.',
+    };
+  }
+  return null;
+}
+
 // ─── Queue helpers ───
 async function saveToQueue(record) {
   const url = SUPABASE_URL();
@@ -550,6 +573,11 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: true, code: 'MISSING_PARAM', message: 'destination deve ser "ig" ou "fb"' });
   }
 
+  if (destination === 'fb') {
+    const scheduleError = facebookScheduleValidation(scheduled_publish_time);
+    if (scheduleError) return res.status(400).json(scheduleError);
+  }
+
   try {
     // ─── INSTAGRAM ───
     if (destination === 'ig') {
@@ -921,14 +949,24 @@ module.exports = async function handler(req, res) {
     }
   } catch (err) {
     // Salva erro no histórico
+    const failedImageUrls = (req.body && req.body.image_urls) || [];
+    const failedMediaUrls = failedImageUrls.length ? failedImageUrls : (image_url || video_url ? [image_url || video_url] : []);
+    let failedScheduledFor = null;
+    if (scheduled_publish_time) {
+      const scheduledMs = Number(scheduled_publish_time) * 1000;
+      if (Number.isFinite(scheduledMs)) failedScheduledFor = new Date(scheduledMs).toISOString();
+    }
     await saveToHistory({
-      user_name: (req.body || {}).user || 'Sistema',
+      user_name: (req.body || {}).user || (req.body || {}).user_name || 'Sistema',
       client_key: (req.body || {}).client || tenant.key,
       client_name: tenant.name || tenant.key,
       platform: destination,
       status: 'FAILED',
       caption: caption || '',
-      has_image: !!image_url,
+      has_image: failedMediaUrls.length > 0,
+      image_url: encodeImageUrl(failedMediaUrls),
+      scheduled_for: failedScheduledFor,
+      error_message: err.message || 'Erro interno ao publicar',
       ...(task_id && { task_id }),
     });
 
