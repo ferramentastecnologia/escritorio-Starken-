@@ -20248,7 +20248,8 @@ var _metaBiState = {
 	  fetchSeq: 0,
 	  lastFetchMeta: null,
 	  creativeCache: {},
-	  campaignDeepCache: {}
+	  campaignDeepCache: {},
+	  campaignHierarchyCache: {}
 	};
 
 function metaBiInit() {
@@ -20501,11 +20502,130 @@ function metaBiApplyCustomDates() {
   metaBiFetchDashboardData(_metaBiState.currentClient, 'custom');
 }
 
-function metaBiGeneratePdfReport() {
+function metaBiPdfHierarchyKey(clientKey, period) {
+  return [clientKey || '', period || '', _metaBiState.customDateStart || '', _metaBiState.customDateEnd || ''].join('|');
+}
+
+async function metaBiBuildPdfHierarchyData(rows) {
+  var clientKey = _metaBiState.currentClient;
+  var client = _metaBiState.allClients[clientKey];
+  var period = _metaBiState.currentPeriod || 'last_7d';
+  var cacheKey = metaBiPdfHierarchyKey(clientKey, period);
+  if (_metaBiState.campaignHierarchyCache && _metaBiState.campaignHierarchyCache[cacheKey]) {
+    return _metaBiState.campaignHierarchyCache[cacheKey];
+  }
+  var map = {};
+  if (!clientKey || !client || !rows || !rows.length) return map;
+  try {
+    var url = metaApiBase() + '/api/meta/insights?client=' + encodeURIComponent(clientKey)
+      + '&tenant=' + encodeURIComponent(client.tenant || '')
+      + '&preset=' + encodeURIComponent(period)
+      + '&level=ad';
+    if (period === 'custom' && _metaBiState.customDateStart && _metaBiState.customDateEnd) {
+      url += '&date_start=' + encodeURIComponent(_metaBiState.customDateStart) + '&date_end=' + encodeURIComponent(_metaBiState.customDateEnd);
+    }
+    var res = await fetch(url);
+    var json = await res.json();
+    if (!res.ok || json.error) throw new Error(json.message || json.error || res.statusText);
+    var clientAdAccount = client.adAccountId || '';
+    var adRows = (json.data || []).filter(function(row) {
+      return !clientAdAccount || row.ad_account_id === clientAdAccount;
+    }).map(metaBiMapInsightRow);
+    for (var i = 0; i < rows.length; i++) {
+      var campaignRow = rows[i];
+      var deep = campaignRow.campaign_id ? await metaBiFetchCampaignDeep(clientKey, campaignRow.campaign_id) : { adsets: [] };
+      var campaignAds = adRows.filter(function(row) {
+        return campaignRow.campaign_id ? row.campaign_id === campaignRow.campaign_id : row.campaign_name === campaignRow.campaign_name;
+      });
+      map[campaignRow.campaign_id || campaignRow.campaign_name] = { adRows: campaignAds, deep: deep };
+    }
+    _metaBiState.campaignHierarchyCache[cacheKey] = map;
+  } catch(e) {
+    console.warn('BI PDF hierarchy unavailable:', e);
+  }
+  return map;
+}
+
+function metaBiPdfMetric(label, value, color) {
+  return '<div style="text-align:right;min-width:56px"><div style="font-size:12px;font-weight:800;color:' + (color || '#1a1a2e') + '">' + value + '</div><div style="font-size:8px;color:#64748b;text-transform:uppercase;letter-spacing:.35px;margin-top:1px">' + label + '</div></div>';
+}
+
+function metaBiRenderPdfCampaignHierarchy(campaignRow, bundle, fmt, fmtN) {
+  if (!bundle) return '';
+  var adRows = bundle.adRows || [];
+  var adMeta = metaBiCampaignAdMap(bundle.deep || {});
+  var grouped = {};
+  adRows.forEach(function(row) {
+    var meta = adMeta[String(row.ad_id || '')] || {};
+    var adsetId = row.adset_id || meta.adset_id || row.adset_name || meta.adset_name || 'sem-conjunto';
+    if (!grouped[adsetId]) grouped[adsetId] = { name: row.adset_name || meta.adset_name || 'Conjunto sem nome', rows: [] };
+    grouped[adsetId].rows.push(row);
+  });
+  Object.keys(adMeta).forEach(function(adId) {
+    var exists = adRows.some(function(row) { return String(row.ad_id || '') === adId; });
+    if (exists) return;
+    var meta = adMeta[adId];
+    var adsetId = meta.adset_id || meta.adset_name || 'sem-conjunto';
+    if (!grouped[adsetId]) grouped[adsetId] = { name: meta.adset_name || 'Conjunto sem nome', rows: [] };
+    grouped[adsetId].rows.push({
+      ad_id: adId,
+      ad_name: meta.name || 'Anúncio',
+      spend: 0,
+      reach: 0,
+      impressions: 0,
+      landingPageViews: 0,
+      conversions: 0,
+      revenue: 0,
+      cpa: 0,
+      roas: 0
+    });
+  });
+  var keys = Object.keys(grouped);
+  if (!keys.length) return '';
+  var html = '<div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin:2px 0 14px;background:#f8fafc">'
+    + '<div style="padding:9px 11px;background:#eef2ff;color:#334155;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.45px">Campanha &gt; Conjuntos &gt; Anúncios</div>';
+  keys.forEach(function(key) {
+    var group = grouped[key];
+    var totalSpend = group.rows.reduce(function(sum, row) { return sum + (row.spend || 0); }, 0);
+    var totalPurchases = group.rows.reduce(function(sum, row) { return sum + (row.conversions || 0); }, 0);
+    html += '<div style="padding:8px 11px;background:#fff;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:10px">'
+      + '<div style="font-size:12px;font-weight:800;color:#1a1a2e">' + esc(group.name) + '</div>'
+      + '<div style="font-size:10px;color:#64748b">' + group.rows.length + ' anúncios · ' + fmt(totalSpend) + ' · ' + fmtN(totalPurchases) + ' compras</div>'
+      + '</div>';
+    group.rows.forEach(function(row) {
+      var meta = adMeta[String(row.ad_id || '')] || {};
+      var image = meta.creativeUrl || '';
+      var roasColor = row.roas >= 5 ? '#22c55e' : row.roas >= 2 ? '#f59e0b' : row.roas > 0 ? '#ef4444' : '#64748b';
+      html += '<div class="ad-row" style="display:grid;grid-template-columns:72px minmax(140px,1fr) auto;gap:10px;align-items:center;padding:10px 11px;background:#fff;border-top:1px solid #e2e8f0">'
+        + '<div style="width:72px;height:72px;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center">'
+        + (image ? '<img crossorigin="anonymous" referrerpolicy="no-referrer" src="' + esc(image) + '" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=&quot;none&quot;">' : '<span style="font-size:10px;color:#94a3b8">sem imagem</span>')
+        + '</div>'
+        + '<div style="min-width:0"><div style="font-size:13px;font-weight:800;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(row.ad_name || meta.name || 'Anúncio') + '</div>'
+        + '<div style="display:inline-block;margin-top:5px;padding:2px 7px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:9px;text-transform:uppercase">' + esc(meta.status || 'sem status') + '</div>'
+        + (meta.creativeName ? '<div style="margin-top:5px;color:#64748b;font-size:10px;line-height:1.3">Criativo: ' + esc(meta.creativeName) + '</div>' : '')
+        + '</div>'
+        + '<div style="display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap">'
+        + metaBiPdfMetric('Invest.', fmt(row.spend || 0))
+        + metaBiPdfMetric('Alcance', fmtN(row.reach || 0))
+        + metaBiPdfMetric('Impress.', fmtN(row.impressions || 0))
+        + metaBiPdfMetric('Visitas', fmtN(row.landingPageViews || 0))
+        + metaBiPdfMetric('Compras', fmtN(row.conversions || 0))
+        + metaBiPdfMetric('Receita', fmt(row.revenue || 0))
+        + metaBiPdfMetric('CPA', fmt(row.cpa || 0))
+        + metaBiPdfMetric('ROAS', row.roas > 0 ? row.roas.toFixed(2) + 'x' : '—', roasColor)
+        + '</div></div>';
+    });
+  });
+  html += '</div>';
+  return html;
+}
+
+async function metaBiGeneratePdfReport() {
   var data = _metaBiState.dashboardData;
   var client = _metaBiState.allClients[_metaBiState.currentClient];
   var template = _metaBiState.currentTemplate;
   if (!data || !client) { alert('Carregue os dados de um cliente primeiro'); return; }
+  var hierarchyMap = await metaBiBuildPdfHierarchyData(data);
 
   // Calculate totals
   var totals = { spend: 0, revenue: 0, conversions: 0, reach: 0, impressions: 0, addToCart: 0, initiateCheckout: 0, landingPageViews: 0 };
@@ -20546,6 +20666,8 @@ function metaBiGeneratePdfReport() {
       + '<div style="font-size:14px;font-weight:700;color:#1a1a2e">' + row.campaign_name + '</div>'
       + '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:' + badge.color + ';color:#fff;padding:4px 10px;border-radius:4px">' + badge.badge + '</span>'
       + '</div>';
+    campaignRows += metaBiRenderPdfCampaignHierarchy(row, hierarchyMap[row.campaign_id || row.campaign_name], fmt, fmtN);
+    campaignRows += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;font-weight:800;margin:12px 0 10px">Consolidado da campanha</div>';
 
     if (template === 'gastronomia') {
       campaignRows += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:13px">'
@@ -20598,6 +20720,8 @@ function metaBiGeneratePdfReport() {
     + '@page { size: A4; margin: 15mm; }'
     + 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin:0; padding:0; background:#f8fafc; color:#1a1a2e; }'
     + '.page { max-width:800px; margin:0 auto; padding:30px; }'
+    + 'img { print-color-adjust:exact; -webkit-print-color-adjust:exact; }'
+    + '.ad-row { break-inside: avoid; page-break-inside: avoid; }'
     + '@media print { body { background:#fff; } .page { padding:0; } .no-print { display:none !important; } }'
     + '</style></head><body>'
     + '<div class="page">'
@@ -20660,8 +20784,8 @@ function metaBiGeneratePdfReport() {
     // Footer
     + '<div style="text-align:center;padding:20px 0;border-top:1px solid #e2e8f0;margin-top:20px;font-size:11px;color:#94a3b8">Relatório gerado automaticamente por Starken OS · ' + new Date().toLocaleDateString('pt-BR') + '</div>'
     // Print button
-    + '<div class="no-print" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="padding:12px 28px;border:none;border-radius:10px;background:linear-gradient(135deg,#1877f2,#8b5cf6);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit"><span class="mso">print</span> Imprimir / Salvar PDF</button></div>'
-    + '</div></body></html>';
+    + '<div class="no-print" style="text-align:center;margin-top:20px"><button id="printBtn" onclick="window.print()" style="padding:12px 28px;border:none;border-radius:10px;background:linear-gradient(135deg,#1877f2,#8b5cf6);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit"><span class="mso">print</span> Imprimir / Salvar PDF</button><div id="imgStatus" style="font-size:11px;color:#64748b;margin-top:8px">Carregando imagens dos criativos...</div></div>'
+    + '</div><script>(function(){var imgs=[].slice.call(document.images);var done=0;function update(){done++;var s=document.getElementById("imgStatus");if(s)s.textContent=done>=imgs.length?"Imagens prontas para PDF":"Carregando imagens dos criativos... "+done+"/"+imgs.length;}if(!imgs.length){update();return;}imgs.forEach(function(img){if(img.complete){update();return;}img.addEventListener("load",update,{once:true});img.addEventListener("error",update,{once:true});});setTimeout(function(){var s=document.getElementById("imgStatus");if(s)s.textContent="PDF pronto. Algumas imagens podem depender da Meta.";},5000);})();<\/script></body></html>';
 
   // Save report to data.reports
   if (data && data.clients && data.reports && client) {
@@ -21359,6 +21483,8 @@ function metaBiGetInterpretation(row, badge) {
 	    var adRows = (json.data || []).filter(function(row) {
 	      return !clientAdAccount || row.ad_account_id === clientAdAccount;
 	    }).map(metaBiMapInsightRow);
+	    var hierarchyCacheKey = metaBiPdfHierarchyKey(clientKey, _metaBiState.currentPeriod || 'last_7d');
+	    var hierarchyCache = {};
 
 	    for (var i = 0; i < unique.length; i++) {
 	      if (requestSeq !== _metaBiState.fetchSeq) return;
@@ -21370,12 +21496,14 @@ function metaBiGetInterpretation(row, badge) {
 	        var campaignAds = adRows.filter(function(row) {
 	          return campaignRow.campaign_id ? row.campaign_id === campaignRow.campaign_id : row.campaign_name === campaignRow.campaign_name;
 	        });
+	        hierarchyCache[campaignRow.campaign_id || campaignRow.campaign_name] = { adRows: campaignAds, deep: deep };
 	        if (requestSeq !== _metaBiState.fetchSeq) return;
 	        el.innerHTML = metaBiRenderCampaignHierarchy(campaignRow, campaignAds, deep);
 	      } catch(e) {
 	        el.innerHTML = '<div style="border:1px dashed var(--border);border-radius:10px;padding:12px;color:#f59e0b;font-size:0.78rem;margin-bottom:14px"><span class="mso">warning</span> Não foi possível montar a hierarquia desta campanha.</div>';
 	      }
 	    }
+	    _metaBiState.campaignHierarchyCache[hierarchyCacheKey] = hierarchyCache;
 	  } catch(e) {
 	    unique.forEach(function(row) {
 	      var el = document.getElementById('metaBiHierarchy_' + metaBiSafeDomId(row.campaign_id || row.campaign_name));
