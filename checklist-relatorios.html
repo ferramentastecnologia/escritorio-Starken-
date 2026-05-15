@@ -6796,6 +6796,57 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
+<style id="npc-center-style">
+.npc-shell{padding:20px;display:grid;gap:18px}
+.npc-hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border:1px solid var(--border);border-radius:18px;background:linear-gradient(135deg,rgba(70,238,205,.08),rgba(12,18,31,.86));padding:22px;box-shadow:var(--shadow)}
+.npc-kicker{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.16em;color:var(--accent,#46eecd);margin-bottom:7px}
+.npc-hero h2{margin:0;color:var(--text);font-size:1.55rem;line-height:1.05}
+.npc-hero p{margin:9px 0 0;color:var(--text-secondary);max-width:820px;line-height:1.45}
+.npc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.npc-card{border:1px solid var(--border);border-radius:18px;background:var(--card);padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:.18s ease;min-height:188px;display:flex;flex-direction:column;gap:12px}
+.npc-card:hover,.npc-card.active{border-color:rgba(70,238,205,.44);transform:translateY(-1px);box-shadow:0 18px 44px rgba(0,0,0,.2)}
+.npc-card-top{display:flex;align-items:center;gap:12px}
+.npc-avatar{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#14283a,#46eecd);display:grid;place-items:center;color:#071313;font-size:1.3rem;font-weight:950;overflow:hidden;border:1px solid rgba(255,255,255,.08);flex-shrink:0}
+.npc-avatar img{width:100%;height:100%;object-fit:cover}
+.npc-name{font-size:1rem;color:var(--text);font-weight:900}
+.npc-role{font-size:.75rem;color:var(--text-secondary);margin-top:2px}
+.npc-pill-row{display:flex;flex-wrap:wrap;gap:6px}
+.npc-pill{border:1px solid rgba(70,238,205,.25);background:rgba(70,238,205,.08);color:#46eecd;border-radius:999px;padding:4px 8px;font-size:.67rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
+.npc-card small{color:var(--text-muted);line-height:1.4}
+.npc-workbench{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr);gap:16px}
+.npc-panel{border:1px solid var(--border);border-radius:18px;background:var(--card);padding:16px;box-shadow:var(--shadow)}
+.npc-panel h3{margin:0 0 12px;color:var(--text);font-size:1rem;display:flex;align-items:center;gap:8px}
+.npc-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.npc-tab-btn{border:1px solid var(--border);background:var(--bg);color:var(--text-secondary);border-radius:999px;padding:8px 12px;font-family:inherit;font-weight:850;cursor:pointer}
+.npc-tab-btn.active{border-color:rgba(70,238,205,.45);background:rgba(70,238,205,.12);color:#46eecd}
+.npc-list{display:grid;gap:9px}
+.npc-list-item{border:1px solid var(--border);background:var(--bg);border-radius:12px;padding:12px;color:var(--text-secondary);line-height:1.4}
+.npc-list-item strong{color:var(--text);display:block;margin-bottom:4px}
+.npc-empty{border:1px dashed var(--border);border-radius:14px;padding:24px;text-align:center;color:var(--text-muted);line-height:1.45}
+.npc-drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:11000;opacity:0;pointer-events:none;transition:.2s ease}
+.npc-drawer-backdrop.open{opacity:1;pointer-events:auto}
+.npc-drawer{position:fixed;top:0;right:0;height:100vh;width:min(520px,94vw);background:var(--bg);border-left:1px solid var(--border);box-shadow:-28px 0 64px rgba(0,0,0,.38);z-index:11001;transform:translateX(104%);transition:.22s ease;display:flex;flex-direction:column}
+.npc-drawer.open{transform:translateX(0)}
+.npc-drawer-head{padding:18px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(70,238,205,.1),rgba(12,18,31,.82))}
+.npc-drawer-title{display:flex;align-items:center;gap:12px}
+.npc-drawer-title h3{margin:0;color:var(--text);font-size:1.08rem}
+.npc-drawer-sub{margin-top:8px;color:var(--text-secondary);font-size:.8rem;line-height:1.4}
+.npc-drawer-close{margin-left:auto;border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:10px;width:38px;height:38px;cursor:pointer}
+.npc-drawer-body{flex:1;display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0}
+.npc-context{padding:12px 16px;border-bottom:1px solid var(--border);display:grid;gap:8px;background:var(--card)}
+.npc-context-row{display:flex;flex-wrap:wrap;gap:6px}
+.npc-chat{padding:14px 16px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.npc-msg{max-width:88%;border:1px solid var(--border);border-radius:16px;padding:10px 12px;line-height:1.42;font-size:.86rem;white-space:pre-wrap}
+.npc-msg.user{align-self:flex-end;background:rgba(70,238,205,.12);color:var(--text);border-color:rgba(70,238,205,.3)}
+.npc-msg.assistant{align-self:flex-start;background:var(--card);color:var(--text-secondary)}
+.npc-compose{border-top:1px solid var(--border);padding:12px;display:grid;gap:8px;background:var(--card)}
+.npc-compose textarea{width:100%;min-height:74px;resize:vertical;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);padding:10px;font-family:inherit;box-sizing:border-box}
+.npc-compose-actions{display:flex;gap:8px;justify-content:space-between;align-items:center}
+.npc-btn{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:10px;padding:9px 12px;font-family:inherit;font-weight:850;cursor:pointer}
+.npc-btn.primary{border-color:transparent;background:linear-gradient(135deg,#18c08f,#46eecd);color:#061313}
+.npc-btn.ghost{background:transparent;color:var(--text-secondary)}
+@media(max-width:1100px){.npc-workbench{grid-template-columns:1fr}.npc-hero{display:block}}
+</style>
 </head>
 <body>
 
@@ -7204,6 +7255,33 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
           <div id="historyEmpty" class="empty-state" style="display:none">
             <div class="empty-icon"><span class="mso">assignment</span></div>
             <p><strong>Nenhum registro</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- NPC CENTER -->
+      <div id="tab-npc-center" class="tab-content">
+        <div class="npc-shell">
+          <div class="npc-hero">
+            <div>
+              <div class="npc-kicker">NPC Command Center</div>
+              <h2>NPCs operacionais</h2>
+              <p>Centralize os agentes do Starken OS: conversa, memória por cliente, memória global, tarefas, relatórios e permissões. Nada aqui substitui os fluxos atuais; esta camada apenas conecta os NPCs ao sistema.</p>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="npc-btn" onclick="npcOpenDrawer('lurdinha',{scope:'global',section:'npc-center'})"><span class="mso">chat</span> Abrir Lurdinha</button>
+              <button class="npc-btn primary" onclick="npcCreateDraft()"><span class="mso">add</span> Novo NPC</button>
+            </div>
+          </div>
+          <div id="npcCards" class="npc-grid"></div>
+          <div class="npc-workbench">
+            <section class="npc-panel">
+              <div id="npcDetail"></div>
+            </section>
+            <aside class="npc-panel">
+              <h3><span class="mso">memory</span> Contexto e memória</h3>
+              <div id="npcMemoryPreview" class="npc-list"></div>
+            </aside>
           </div>
         </div>
       </div>
@@ -10953,7 +11031,8 @@ let SIDEBAR_MENU = [
     { type: 'item', id: 'history', label: 'Histórico', icon: '<span class="mso">assignment</span>', tab: 'history' },
     { type: 'item', id: 'system-logs', label: 'Logs do Sistema', icon: '<span class="mso">build</span>', tab: 'system-logs' },
   ]},
-  { type: 'category', id: 'cat-agents', label: 'Agents', items: [
+  { type: 'category', id: 'cat-agents', label: 'NPCs', items: [
+    { type: 'item', id: 'npc-center', label: 'Central de NPCs', icon: '<span class="mso">hub</span>', tab: 'npc-center' },
     { type: 'item', id: 'ai-squads', label: 'AI Squads', icon: '<span class="mso">smart_toy</span>', tab: 'ai-squads' },
   ]},
 ];
@@ -11088,6 +11167,7 @@ var SIDEBAR_ICON_EM = {
   'clients':      'users',
   'history':      'folder',
   'system-logs':  'settings',
+  'npc-center':   'robot',
   'ai-squads':    'robot',
 };
 
@@ -12535,6 +12615,7 @@ const TAB_TITLES = {
   'asana-tasks':       'Tarefas (Asana)',
   clients:             'Gerenciar Clientes',
   history:       'Histórico de Envios',
+  'npc-center':        'Central de NPCs',
   'ai-squads':         'AI Squads',
   'meta-config':       'Configuração Meta',
   'meta-balance':      'Saldo das Contas',
@@ -12588,6 +12669,7 @@ function switchTab(tabName) {
   else if (tabName === 'content-approval') caInitTab();
   else if (tabName === 'asana-tasks') asanaInitTab();
   else if (tabName === 'gestao') { if (typeof Gestao !== 'undefined') { Gestao.populateClientFilter(); Gestao.renderCurrentView(); } }
+  else if (tabName === 'npc-center') npcInit();
   else if (tabName === 'ai-squads') { /* sem init necessário */ }
   else if (tabName === 'meta-config') metaConfigInit();
   else if (tabName === 'meta-balance') metaBalanceInit();
@@ -31515,7 +31597,8 @@ function clientTimelineRenderHome() {
     return '<div class="ctl-next-item" onclick="clientTimelineOpenClientContent(' + ctlJsArg(a.key) + ')" style="cursor:pointer"><strong>' + ctlEsc(a.title) + '</strong><small>' + ctlEsc(a.text) + '</small></div>';
   }).join('') : '<div class="ctl-empty">Nenhuma ação crítica agora.</div>';
   ai.innerHTML = '<div class="ctl-next-item"><strong>Visão geral · ' + (snap.overdue.length ? 'Atenção' : 'OK') + '</strong><small>' + ctlEsc('Semana: ' + (snap.weekInfo.label || snap.weekKey) + '. Base Starken operacional: ' + active.length + ' clientes; ' + contentActive.length + ' com conteúdo na semana. Há ' + snap.crono.pending + ' cronogramas pendentes, ' + snap.overdue.length + ' tasks atrasadas e ' + snap.approvals.length + ' aprovações abertas.') + '</small></div>' +
-    '<button class="ctl-btn primary" style="width:100%;margin-top:8px" onclick="clientTimelineHomeAnalyze()">Gerar análise geral</button>';
+    '<button class="ctl-btn primary" style="width:100%;margin-top:8px" onclick="clientTimelineHomeAnalyze()">Gerar análise geral</button>' +
+    '<button class="ctl-btn" style="width:100%;margin-top:8px" onclick="npcOpenDrawer(\'lurdinha\', {scope:\'global\', section:\'client-timeline\', title:\'Timeline geral da operação\'})"><span class="mso">chat</span> Conversar com Lurdinha</button>';
   if (notes) notes.innerHTML = '<div class="ctl-empty" style="padding:12px">Selecione um cliente para notas rápidas individuais.</div>';
 }
 
@@ -31691,7 +31774,16 @@ function clientTimelineRenderLurdinha(tasks, byStage) {
   el.innerHTML = findings.map(function(f) {
     return '<div class="ctl-next-item"><strong>' + ctlEsc(f.level) + ' · ' + ctlEsc(f.title) + '</strong><small>' + ctlEsc(f.text) + '</small></div>';
   }).join('') +
-  '<button class="ctl-btn primary" style="width:100%;margin-top:8px" onclick="clientTimelineLurdinhaAnalyze()">Gerar análise operacional</button>';
+  '<button class="ctl-btn primary" style="width:100%;margin-top:8px" onclick="clientTimelineLurdinhaAnalyze()">Gerar análise operacional</button>' +
+  '<button class="ctl-btn" style="width:100%;margin-top:8px" onclick="npcOpenDrawer(\'lurdinha\', clientTimelineNpcContext())"><span class="mso">chat</span> Conversar com Lurdinha</button>';
+}
+
+function clientTimelineNpcContext() {
+  if (!_ctlClientSlug) {
+    return { scope: 'global', section: 'client-timeline', title: 'Timeline geral da operação' };
+  }
+  var client = (typeof _metaClients !== 'undefined' && _metaClients[_ctlClientSlug]) ? _metaClients[_ctlClientSlug] : {};
+  return { scope: 'client', clientId: _ctlClientSlug, clientName: client.name || client.pageName || _ctlClientSlug, section: 'client-timeline', title: 'Timeline do cliente' };
 }
 
 function clientTimelineLurdinhaAnalyze() {
@@ -38992,6 +39084,262 @@ function _doRenderTable() {
   body.innerHTML = html;
 }
 
+// ═══ NPC CENTER / GLOBAL DRAWER ═══
+const NPC_PROFILES = [
+  { id:'lurdinha', name:'Lurdinha', initials:'LU', role:'Gerente operacional da timeline', runtime:'Codex', model:'Padrão', tone:'direta, cuidadosa e operacional', domains:['Operação','Timeline','Cobrança','Aprovações'], tools:['Analisar fluxo','Criar follow-up','Gerar relatório','Notificar responsáveis'], color:'#46eecd' },
+  { id:'lord-stanken', name:'Lord Stanken', initials:'LS', role:'Estratégia e direção executiva', runtime:'Codex', model:'Padrão', tone:'estratégico, objetivo e exigente', domains:['Estratégia','Prioridades','Reuniões','Decisão'], tools:['Resumo executivo','Mapa de risco','Plano de ação'], color:'#60a5fa' },
+  { id:'npc-designer', name:'NPC Designer', initials:'DS', role:'Design, identidade e aprovações visuais', runtime:'Codex', model:'Padrão', tone:'visual, criterioso e prático', domains:['Design','Galeria','Referências','Identidade'], tools:['Revisar criativo','Organizar referências','Sugerir ajuste'], color:'#a78bfa' },
+  { id:'npc-trafego', name:'NPC Tráfego', initials:'TR', role:'Meta Ads, Google Ads e performance', runtime:'Codex', model:'Padrão', tone:'analítico e focado em ação', domains:['Meta Ads','Google Ads','Campanhas','Saldo'], tools:['Ler métricas','Sugerir otimização','Criar plano'], color:'#22c55e' },
+  { id:'npc-atendimento', name:'NPC Atendimento', initials:'AT', role:'Cliente, Telegram e aprovações', runtime:'Codex', model:'Padrão', tone:'cordial, claro e responsável', domains:['Telegram','Aprovação','Reclamações','Sugestões'], tools:['Rascunhar resposta','Registrar reclamação','Criar proposta'], color:'#f59e0b' },
+  { id:'npc-relatorios', name:'NPC Relatórios', initials:'RP', role:'Relatórios semanais, mensais e insights', runtime:'Codex', model:'Padrão', tone:'editorial, preciso e sintético', domains:['Relatórios','BI','Insights','Entrega'], tools:['Gerar resumo','Comparar períodos','Criar recomendação'], color:'#38bdf8' }
+];
+
+var _npcState = { activeNpc:'lurdinha', activeTab:'resumo', context:{ scope:'global', section:'npc-center' } };
+
+function npcEsc(v) {
+  return typeof esc === 'function' ? esc(v) : String(v == null ? '' : v).replace(/[&<>"']/g, function(ch) {
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
+  });
+}
+
+function npcProfile(id) {
+  return NPC_PROFILES.find(function(n) { return n.id === id; }) || NPC_PROFILES[0];
+}
+
+function npcCreateDraft() {
+  showToast('Novo NPC: estrutura pronta. A criação persistente entra na próxima etapa segura.');
+  npcOpenDrawer('lord-stanken', { scope:'global', section:'npc-center', title:'Configuração de NPCs' });
+}
+
+function npcInit() {
+  npcRenderCards();
+  npcRenderDetail(_npcState.activeNpc || 'lurdinha');
+}
+
+function npcMemoryStore() {
+  try { return JSON.parse(localStorage.getItem('starken_npc_memory_v1') || '{}'); } catch(e) { return {}; }
+}
+
+function npcSaveMemoryStore(store) {
+  try { localStorage.setItem('starken_npc_memory_v1', JSON.stringify(store || {})); } catch(e) {}
+}
+
+function npcMemoryBucket(ctx) {
+  ctx = ctx || {};
+  if (ctx.scope === 'client' && ctx.clientId) return 'client:' + ctx.clientId;
+  if (ctx.section && ctx.scope === 'section') return 'section:' + ctx.section;
+  return 'global';
+}
+
+function npcGetMemories(npcId, ctx) {
+  var store = npcMemoryStore();
+  var npc = store[npcId] || {};
+  var global = npc.global || [];
+  var bucket = npcMemoryBucket(ctx);
+  var scoped = bucket === 'global' ? [] : (npc[bucket] || []);
+  return { global: global, scoped: scoped, bucket: bucket };
+}
+
+function npcAddMemory(npcId, ctx, text) {
+  text = String(text || '').trim();
+  if (!text) return false;
+  var store = npcMemoryStore();
+  var npc = store[npcId] || {};
+  var bucket = npcMemoryBucket(ctx);
+  npc[bucket] = npc[bucket] || [];
+  npc[bucket].unshift({ text:text, at:new Date().toISOString(), section:(ctx && ctx.section) || 'geral', clientId:(ctx && ctx.clientId) || null });
+  npc[bucket] = npc[bucket].slice(0, 80);
+  store[npcId] = npc;
+  npcSaveMemoryStore(store);
+  return true;
+}
+
+function npcConversationKey(npcId, ctx) {
+  ctx = ctx || {};
+  return 'starken_npc_chat_v1:' + [npcId, ctx.scope || 'global', ctx.clientId || 'all', ctx.section || 'geral'].join(':');
+}
+
+function npcGetConversation(npcId, ctx) {
+  try { return JSON.parse(localStorage.getItem(npcConversationKey(npcId, ctx)) || '[]'); } catch(e) { return []; }
+}
+
+function npcSaveConversation(npcId, ctx, rows) {
+  try { localStorage.setItem(npcConversationKey(npcId, ctx), JSON.stringify((rows || []).slice(-120))); } catch(e) {}
+}
+
+function npcContextLabel(ctx) {
+  ctx = ctx || {};
+  if (ctx.scope === 'client') return 'Cliente: ' + (ctx.clientName || ctx.clientId || 'selecionado');
+  if (ctx.section === 'escritorio') return 'Escritório Virtual: operação completa';
+  if (ctx.section === 'client-timeline' && ctx.scope === 'global') return 'Timeline: todos os clientes';
+  return 'Operação global';
+}
+
+function npcContextSnapshot(ctx) {
+  ctx = ctx || {};
+  var parts = [];
+  if (ctx.scope === 'client') {
+    parts.push('Use memória específica do cliente ' + (ctx.clientName || ctx.clientId || 'selecionado') + '.');
+  } else {
+    parts.push('Use visão global da operação e memórias de todos os clientes disponíveis.');
+  }
+  if (ctx.section === 'client-timeline') {
+    try {
+      if (ctx.scope === 'client' && typeof clientTimelineLurdinhaFindings === 'function') {
+        var tasks = (_ctlTasks || []).filter(typeof clientTimelineInRange === 'function' ? clientTimelineInRange : function(){ return true; });
+        parts.push('Timeline do cliente com ' + tasks.length + ' item(ns) neste filtro.');
+      } else if (typeof clientTimelineHomeSnapshot === 'function') {
+        var snap = clientTimelineHomeSnapshot();
+        parts.push('Timeline global: ' + snap.active.length + ' cliente(s), ' + snap.crono.pending + ' cronograma(s) pendente(s), ' + snap.overdue.length + ' task(s) atrasada(s).');
+      }
+    } catch(e) {}
+  }
+  return parts.join(' ');
+}
+
+function npcRenderCards() {
+  var el = document.getElementById('npcCards');
+  if (!el) return;
+  el.innerHTML = NPC_PROFILES.map(function(n) {
+    return '<button class="npc-card ' + (_npcState.activeNpc === n.id ? 'active' : '') + '" onclick="npcRenderDetail(\'' + npcEsc(n.id) + '\')">' +
+      '<div class="npc-card-top"><div class="npc-avatar" style="background:linear-gradient(135deg,rgba(255,255,255,.08),' + n.color + ')">' + npcEsc(n.initials) + '</div>' +
+      '<div><div class="npc-name">' + npcEsc(n.name) + '</div><div class="npc-role">' + npcEsc(n.role) + '</div></div></div>' +
+      '<div class="npc-pill-row">' + n.domains.slice(0,3).map(function(d){ return '<span class="npc-pill">' + npcEsc(d) + '</span>'; }).join('') + '</div>' +
+      '<small>' + npcEsc('Memória global + memória por cliente. Runtime: ' + n.runtime + ' · ' + n.model) + '</small>' +
+      '<div style="margin-top:auto;display:flex;gap:8px"><span class="npc-pill">Ativo</span><span class="npc-pill">' + npcEsc(n.tools.length) + ' ferramentas</span></div>' +
+    '</button>';
+  }).join('');
+}
+
+function npcRenderDetail(npcId) {
+  _npcState.activeNpc = npcId;
+  npcRenderCards();
+  var npc = npcProfile(npcId);
+  var detail = document.getElementById('npcDetail');
+  var mem = document.getElementById('npcMemoryPreview');
+  if (!detail || !mem) return;
+  var memories = npcGetMemories(npcId, { scope:'global', section:'npc-center' });
+  detail.innerHTML = '<div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px">' +
+    '<div class="npc-avatar" style="background:linear-gradient(135deg,rgba(255,255,255,.08),' + npc.color + ')">' + npcEsc(npc.initials) + '</div>' +
+    '<div style="min-width:0"><h3 style="margin:0 0 4px">' + npcEsc(npc.name) + '</h3><div style="color:var(--text-secondary);font-size:.86rem;line-height:1.45">' + npcEsc(npc.role) + '</div></div>' +
+    '<button class="npc-btn primary" style="margin-left:auto" onclick="npcOpenDrawer(\'' + npcEsc(npc.id) + '\',{scope:\'global\',section:\'npc-center\',title:\'Central de NPCs\'})"><span class="mso">chat</span> Conversar</button>' +
+  '</div>' +
+  '<div class="npc-tabs"><button class="npc-tab-btn active">Resumo</button><button class="npc-tab-btn">Tarefas</button><button class="npc-tab-btn">Biblioteca</button><button class="npc-tab-btn">Relatórios</button><button class="npc-tab-btn">Configuração</button></div>' +
+  '<div class="npc-list">' +
+    '<div class="npc-list-item"><strong>Função</strong>' + npcEsc(npc.role) + '</div>' +
+    '<div class="npc-list-item"><strong>Ferramentas permitidas</strong>' + npc.tools.map(npcEsc).join(' · ') + '</div>' +
+    '<div class="npc-list-item"><strong>Tom de trabalho</strong>' + npcEsc(npc.tone) + '</div>' +
+    '<div class="npc-list-item"><strong>Escopo de memória</strong>Global no escritório, por cliente dentro de cada cliente, por setor dentro das páginas do sistema.</div>' +
+  '</div>';
+  var globalRows = memories.global.slice(0, 5);
+  mem.innerHTML = globalRows.length ? globalRows.map(function(m) {
+    return '<div class="npc-list-item"><strong>' + new Date(m.at).toLocaleString('pt-BR') + '</strong>' + npcEsc(m.text) + '</div>';
+  }).join('') : '<div class="npc-empty"><span class="mso">memory</span><br>Sem memórias globais salvas para este NPC ainda.<br>Abra o chat e use <strong>lembrar:</strong> para registrar uma memória.</div>';
+}
+
+function npcOpenDrawer(npcId, ctx) {
+  _npcState.activeNpc = npcId || 'lurdinha';
+  _npcState.context = ctx || { scope:'global', section:'npc-center' };
+  var npc = npcProfile(_npcState.activeNpc);
+  var drawer = document.getElementById('npcDrawer');
+  var backdrop = document.getElementById('npcDrawerBackdrop');
+  if (!drawer || !backdrop) return;
+  document.getElementById('npcDrawerAvatar').textContent = npc.initials;
+  document.getElementById('npcDrawerAvatar').style.background = 'linear-gradient(135deg,rgba(255,255,255,.08),' + npc.color + ')';
+  document.getElementById('npcDrawerName').textContent = npc.name;
+  document.getElementById('npcDrawerRole').textContent = npc.role;
+  document.getElementById('npcDrawerSub').textContent = npcContextSnapshot(_npcState.context);
+  npcRenderDrawerContext();
+  npcRenderChat();
+  backdrop.classList.add('open');
+  drawer.classList.add('open');
+  setTimeout(function(){ var input = document.getElementById('npcChatInput'); if (input) input.focus(); }, 120);
+}
+
+function npcCloseDrawer() {
+  var drawer = document.getElementById('npcDrawer');
+  var backdrop = document.getElementById('npcDrawerBackdrop');
+  if (drawer) drawer.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('open');
+}
+
+function npcRenderDrawerContext() {
+  var ctx = _npcState.context || {};
+  var npcId = _npcState.activeNpc;
+  var box = document.getElementById('npcDrawerContext');
+  var mem = document.getElementById('npcDrawerMemory');
+  if (!box || !mem) return;
+  var memories = npcGetMemories(npcId, ctx);
+  box.innerHTML = '<span class="npc-pill">' + npcEsc(npcContextLabel(ctx)) + '</span><span class="npc-pill">' + npcEsc(ctx.section || 'geral') + '</span><span class="npc-pill">' + npcEsc(memories.bucket) + '</span>';
+  var total = memories.global.length + memories.scoped.length;
+  mem.innerHTML = total
+    ? 'Memória carregada: ' + memories.global.length + ' global(is) + ' + memories.scoped.length + ' deste contexto.'
+    : 'Sem memória salva ainda neste contexto. Você pode registrar aprendizados com "lembrar: ...".';
+}
+
+function npcRenderChat() {
+  var el = document.getElementById('npcChatMessages');
+  if (!el) return;
+  var rows = npcGetConversation(_npcState.activeNpc, _npcState.context);
+  if (!rows.length) {
+    var npc = npcProfile(_npcState.activeNpc);
+    rows = [{ role:'assistant', text:'Oi, eu sou ' + npc.name + '. Estou aberta com o contexto: ' + npcContextLabel(_npcState.context) + '. Posso analisar, registrar memória, criar próximos passos e manter histórico desta conversa.' }];
+    npcSaveConversation(_npcState.activeNpc, _npcState.context, rows);
+  }
+  el.innerHTML = rows.map(function(m) {
+    return '<div class="npc-msg ' + (m.role === 'user' ? 'user' : 'assistant') + '">' + npcEsc(m.text) + '</div>';
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function npcAssistantReply(npc, ctx, text) {
+  var memories = npcGetMemories(npc.id, ctx);
+  var prefix = ctx && ctx.scope === 'client'
+    ? 'Estou considerando a memória deste cliente e as regras gerais do meu papel.'
+    : 'Estou considerando a memória global da operação e o panorama de todos os clientes.';
+  var action = 'Próximo passo sugerido: transformar isso em uma task, relatório ou follow-up antes de acionar o cliente.';
+  if (/cronograma|timeline/i.test(text)) action = 'Próximo passo sugerido: revisar gargalos da timeline, aprovações abertas e cronogramas pendentes.';
+  if (/tr[aá]fego|ads|campanha|roas/i.test(text)) action = 'Próximo passo sugerido: cruzar campanha, gasto, ROAS, saldo e task operacional antes de recomendar alteração.';
+  if (/reuni[aã]o|insight|mem[oó]ria/i.test(text)) action = 'Próximo passo sugerido: salvar como memória do contexto para reaproveitar nos próximos relatórios e atendimentos.';
+  return prefix + '\n\n' + action + '\n\nMemórias disponíveis agora: ' + memories.global.length + ' globais e ' + memories.scoped.length + ' deste contexto.';
+}
+
+function npcSendMessage() {
+  var input = document.getElementById('npcChatInput');
+  if (!input) return;
+  var text = input.value.trim();
+  if (!text) return;
+  var npc = npcProfile(_npcState.activeNpc);
+  var rows = npcGetConversation(npc.id, _npcState.context);
+  rows.push({ role:'user', text:text, at:new Date().toISOString() });
+  if (/^lembrar\s*:/i.test(text)) {
+    npcAddMemory(npc.id, _npcState.context, text.replace(/^lembrar\s*:/i, '').trim());
+    rows.push({ role:'assistant', text:'Memória salva neste contexto. Vou usar isso nas próximas conversas e análises.', at:new Date().toISOString() });
+  } else {
+    rows.push({ role:'assistant', text:npcAssistantReply(npc, _npcState.context, text), at:new Date().toISOString() });
+  }
+  npcSaveConversation(npc.id, _npcState.context, rows);
+  input.value = '';
+  npcRenderDrawerContext();
+  npcRenderChat();
+  if (document.getElementById('tab-npc-center') && document.getElementById('tab-npc-center').classList.contains('active')) npcRenderDetail(npc.id);
+}
+
+function npcSaveInputAsMemory() {
+  var input = document.getElementById('npcChatInput');
+  if (!input || !input.value.trim()) return showToast('Digite a memória antes de salvar');
+  npcAddMemory(_npcState.activeNpc, _npcState.context, input.value.trim());
+  input.value = '';
+  npcRenderDrawerContext();
+  npcRenderChat();
+  showToast('Memória salva para este contexto');
+}
+
+function npcClearConversation() {
+  try { localStorage.removeItem(npcConversationKey(_npcState.activeNpc, _npcState.context)); } catch(e) {}
+  npcRenderChat();
+}
+
 </script>
 
 <!-- ═══ NEW GROUP MODAL ═══ -->
@@ -39171,6 +39519,38 @@ function _doRenderTable() {
 </div>
 
 <!-- ═══ DESIGNER OVERVIEW BTN ═══ -->
+<div id="npcDrawerBackdrop" class="npc-drawer-backdrop" onclick="npcCloseDrawer()"></div>
+<aside id="npcDrawer" class="npc-drawer" aria-label="Chat do NPC">
+  <div class="npc-drawer-head">
+    <div class="npc-drawer-title">
+      <div id="npcDrawerAvatar" class="npc-avatar">L</div>
+      <div>
+        <h3 id="npcDrawerName">Lurdinha</h3>
+        <div id="npcDrawerRole" class="npc-role">Gerente operacional</div>
+      </div>
+      <button class="npc-drawer-close" onclick="npcCloseDrawer()"><span class="mso">close</span></button>
+    </div>
+    <div id="npcDrawerSub" class="npc-drawer-sub"></div>
+  </div>
+  <div class="npc-drawer-body">
+    <div class="npc-context">
+      <div id="npcDrawerContext" class="npc-context-row"></div>
+      <div id="npcDrawerMemory" style="font-size:.78rem;color:var(--text-secondary);line-height:1.4"></div>
+    </div>
+    <div id="npcChatMessages" class="npc-chat"></div>
+    <div class="npc-compose">
+      <textarea id="npcChatInput" placeholder="Converse com o NPC. Use 'lembrar: ...' para salvar uma memória neste contexto."></textarea>
+      <div class="npc-compose-actions">
+        <button class="npc-btn ghost" onclick="npcSaveInputAsMemory()"><span class="mso">memory</span> Salvar memória</button>
+        <div style="display:flex;gap:8px">
+          <button class="npc-btn" onclick="npcClearConversation()"><span class="mso">restart_alt</span> Limpar</button>
+          <button class="npc-btn primary" onclick="npcSendMessage()"><span class="mso">send</span> Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</aside>
+
 <div id="designerOverviewBtn" style="display:none;position:fixed;bottom:24px;right:24px;z-index:9000">
   <button onclick="openDesignerOverview()" style="background:#1e3a5f;color:#fff;border:none;border-radius:12px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(30,58,95,0.35);display:flex;align-items:center;gap:8px;transition:background 0.15s" onmouseover="this.style.background='#2a4dd7'" onmouseout="this.style.background='#1e3a5f'">
     <span class="mso">palette</span> Tasks Designers
