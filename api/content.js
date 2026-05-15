@@ -527,6 +527,93 @@ async function markNotificationRead({ id, user }) {
   return ok({ success: true, notification: Array.isArray(rows) ? rows[0] : rows, user: user || null });
 }
 
+async function sendTimelineTelegramMessage(text) {
+  const token = process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_TOKEN || '';
+  const chatId = process.env.TELEGRAM_OPERATIONAL_GROUP_ID || process.env.TELEGRAM_AGENTS_GROUP_ID || process.env.TELEGRAM_CHAT_ID || '';
+  if (!token || !chatId) return false;
+  const chunks = String(text || '').match(/[\s\S]{1,3500}/g) || [];
+  for (const chunk of chunks) {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: chunk, disable_web_page_preview: true }),
+    });
+    if (!res.ok) throw new Error(`Telegram send failed: ${res.status} ${await res.text()}`);
+  }
+  return true;
+}
+
+async function notifyTimelineAnalysis({ recipients, title, message, user, metadata }) {
+  const people = Array.isArray(recipients) ? recipients : String(recipients || '').split(',');
+  const unique = [...new Set(people.map((name) => String(name || '').trim()).filter(Boolean))];
+  if (!unique.length) return fail('recipients is required');
+  const now = new Date().toISOString();
+  const cleanTitle = title || 'Lurdinha · análise geral da timeline';
+  const text = `${cleanTitle}
+Para: ${unique.join(', ')}
+
+${message || ''}`;
+  let telegramSent = false;
+  let telegramError = null;
+  try {
+    telegramSent = await sendTimelineTelegramMessage(text);
+  } catch (err) {
+    telegramError = err.message || String(err);
+    console.error('[content] timeline telegram failed:', telegramError);
+  }
+
+  const rows = [];
+  const dbErrors = [];
+  for (const recipient of unique) {
+    const record = {
+      recipient,
+      actor: user || 'Lurdinha',
+      event: 'timeline_analysis',
+      source: 'client_timeline',
+      task_id: null,
+      task_name: cleanTitle,
+      client_id: null,
+      group_id: null,
+      title: cleanTitle,
+      message: message || '',
+      channels: JSON.stringify(['office', 'telegram']),
+      metadata: JSON.stringify({ ...(metadata || {}), telegram_sent: telegramSent, telegram_error: telegramError }),
+      read_at: null,
+      delivered_at: telegramSent ? now : null,
+      created_at: now,
+      updated_at: now,
+    };
+    try {
+      const inserted = await supaInsert('content_notifications', record);
+      const notification = Array.isArray(inserted) ? inserted[0] : inserted;
+      rows.push(notification || record);
+      await supaInsert('content_notification_outbox', {
+        notification_id: notification?.id || null,
+        recipient,
+        channel: 'telegram',
+        status: telegramSent ? 'sent' : 'pending',
+        payload: JSON.stringify({ recipient, title: record.title, message: record.message, metadata: metadata || {} }),
+        created_at: now,
+        updated_at: now,
+      }).catch((err) => dbErrors.push(err.message || String(err)));
+    } catch (err) {
+      dbErrors.push(err.message || String(err));
+    }
+  }
+
+  if (!rows.length && !telegramSent) {
+    console.warn('[content] timeline notification stored only in response; notification tables or telegram env unavailable', dbErrors[0] || 'no provider');
+  }
+  return ok({
+    success: true,
+    recipients: unique,
+    telegram_sent: telegramSent,
+    telegram_error: telegramError,
+    notifications_created: rows.length,
+    notification_errors: dbErrors.slice(0, 3),
+  });
+}
+
 function safeJson(value, fallback) {
   try {
     return JSON.parse(value);
@@ -1336,6 +1423,7 @@ const ACTIONS = {
   list_my_tasks: listMyTasks,
   list_notifications: listNotifications,
   mark_notification_read: markNotificationRead,
+  notify_timeline_analysis: notifyTimelineAnalysis,
   task_overview: taskOverview,
   get_task: getTask,
   upsert_task: upsertTask,

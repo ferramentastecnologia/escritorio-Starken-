@@ -4518,6 +4518,12 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
 .ctl-home-chip.ok { color:#46eecd; border-color:rgba(70,238,205,.25); background:rgba(70,238,205,.08); }
 .ctl-home-chip.warn { color:#fbbf24; border-color:rgba(251,191,36,.28); background:rgba(251,191,36,.08); }
 .ctl-home-chip.bad { color:#f87171; border-color:rgba(239,68,68,.28); background:rgba(239,68,68,.08); }
+.ctl-home-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:-2px 0 12px; flex-wrap:wrap; }
+.ctl-home-weeknav { display:flex; align-items:center; gap:6px; }
+.ctl-home-weeknav .ctl-home-chip { min-height:26px; }
+.ctl-home-week-label { color:var(--text-secondary); font-size:.72rem; font-weight:850; white-space:nowrap; }
+.ctl-home-filterbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+.ctl-home-filterbar .ctl-home-chip.active { color:#46eecd; border-color:rgba(70,238,205,.42); background:rgba(70,238,205,.12); box-shadow:0 0 0 1px rgba(70,238,205,.08) inset; }
 .ctl-home-empty { padding: 18px; color: var(--text-muted); text-align:center; border:1px dashed var(--border); border-radius:10px; background:var(--bg); }
 @media (max-width: 980px) {
   .ctl-home-grid { grid-template-columns: 1fr; }
@@ -31162,6 +31168,8 @@ function clientTimelineNextStatus(status) {
 var _ctlHomeTasks = [];
 var _ctlHomeLoaded = false;
 var _ctlHomeLoading = false;
+var _ctlHomeWeekKey = null;
+var _ctlHomeCronoFilter = 'all';
 
 function clientTimelineIsOperationalClient(input) {
   var c = typeof input === 'object' && input ? input : {};
@@ -31203,8 +31211,60 @@ function clientTimelineActiveClients() {
   return list.sort(function(a,b) { return a.name.localeCompare(b.name, 'pt-BR'); });
 }
 
+function clientTimelineHomeWeekKey() {
+  if (_ctlHomeWeekKey) return _ctlHomeWeekKey;
+  return (typeof _dashGetCurrentWeekKey === 'function') ? _dashGetCurrentWeekKey() : '';
+}
+
+function clientTimelineHomeWeekInfo(weekKey) {
+  var key = weekKey || clientTimelineHomeWeekKey();
+  var info = { key:key, label:key || 'Semana atual', startISO:'', endISO:'' };
+  if (!key || key.indexOf('-S') < 0 || typeof MONTHS_2026 === 'undefined' || typeof getMonthWeeks !== 'function') return info;
+  var parts = key.split('-S');
+  var monthKey = parts[0];
+  var weekNum = parseInt(parts[1], 10) || 1;
+  var mInfo = MONTHS_2026.find(function(m) { return m.key === monthKey; });
+  if (!mInfo) return info;
+  var week = getMonthWeeks(mInfo.year, mInfo.month).find(function(w) { return w.week === weekNum; });
+  if (!week) return info;
+  info.startISO = week.periodStartISO;
+  info.endISO = week.periodEndISO;
+  info.label = (typeof _dashWeekLabel === 'function') ? _dashWeekLabel(key) : key;
+  return info;
+}
+
+function clientTimelineHomeWeekKeys() {
+  return (typeof _dashAllWeekKeys === 'function') ? _dashAllWeekKeys() : [clientTimelineHomeWeekKey()].filter(Boolean);
+}
+
+function clientTimelineHomeNavWeek(delta) {
+  var all = clientTimelineHomeWeekKeys();
+  var current = clientTimelineHomeWeekKey();
+  var idx = all.indexOf(current);
+  if (idx < 0) idx = all.indexOf((typeof _dashGetCurrentWeekKey === 'function') ? _dashGetCurrentWeekKey() : current);
+  var nextIdx = idx + delta;
+  if (nextIdx < 0 || nextIdx >= all.length) return;
+  _ctlHomeWeekKey = all[nextIdx];
+  _ctlHomeLoaded = false;
+  _ctlHomeTasks = [];
+  clientTimelineRefreshHome(true);
+}
+
+function clientTimelineHomeResetWeek() {
+  _ctlHomeWeekKey = null;
+  _ctlHomeLoaded = false;
+  _ctlHomeTasks = [];
+  clientTimelineRefreshHome(true);
+}
+
+function clientTimelineHomeSetCronoFilter(filter) {
+  _ctlHomeCronoFilter = filter || 'all';
+  clientTimelineRenderHome();
+}
+
 function clientTimelineHomeRange() {
-  if (typeof _dashGetCalendarWeekRange === 'function') return _dashGetCalendarWeekRange();
+  var weekInfo = clientTimelineHomeWeekInfo();
+  if (weekInfo.startISO && weekInfo.endISO) return { startISO: weekInfo.startISO, endISO: weekInfo.endISO };
   var now = new Date();
   var day = now.getDay();
   var diff = day === 0 ? -6 : 1 - day;
@@ -31293,9 +31353,19 @@ async function clientTimelineRefreshHome(force) {
 
 function clientTimelineHomeSnapshot() {
   var active = clientTimelineActiveClients();
-  var weekKey = (typeof _dashGetCurrentWeekKey === 'function') ? _dashGetCurrentWeekKey() : '';
+  var weekKey = clientTimelineHomeWeekKey();
+  var weekInfo = clientTimelineHomeWeekInfo(weekKey);
+  var tasks = _ctlHomeTasks || [];
+  var contentKeys = {};
+  tasks.forEach(function(t) {
+    var key = clientTimelineTaskClientKey(t);
+    if (key) contentKeys[key] = true;
+  });
+  var contentActive = active.filter(function(c) {
+    return !!(contentKeys[c.metaKey] || contentKeys[c.id] || contentKeys[c.slug]);
+  });
   var crono = { sent: 0, generated: 0, pending: 0, rows: [] };
-  active.forEach(function(c) {
+  contentActive.forEach(function(c) {
     var st = (typeof _dashGetStatus === 'function') ? _dashGetStatus(c.id, 'sched-weekly', weekKey) : { status: 0 };
     var status = st && st.status ? st.status : 0;
     if (status === 2) crono.sent++;
@@ -31308,7 +31378,6 @@ function clientTimelineHomeSnapshot() {
       pdf_name: st && st.pdf_name
     }));
   });
-  var tasks = _ctlHomeTasks || [];
   var today = new Date();
   var open = tasks.filter(function(t) { return !(typeof mtIsDoneStatus === 'function' ? mtIsDoneStatus(t.status) : /publicado|complete|completed|cancelado|cancelled/i.test(t.status || '')); });
   var overdue = open.filter(function(t) {
@@ -31333,7 +31402,7 @@ function clientTimelineHomeSnapshot() {
   approvals.forEach(function(t) { addRisk(clientTimelineTaskClientKey(t), 3, 'aguarda aprovação'); });
   noOwner.forEach(function(t) { addRisk(clientTimelineTaskClientKey(t), 2, 'sem responsável'); });
   var critical = Object.keys(byClient).map(function(k) { return byClient[k]; }).sort(function(a,b) { return b.score - a.score || a.name.localeCompare(b.name, 'pt-BR'); });
-  return { active: active, weekKey: weekKey, range: clientTimelineHomeRange(), crono: crono, tasks: tasks, open: open, overdue: overdue, noOwner: noOwner, approvals: approvals, scheduled: scheduled, published: published, critical: critical };
+  return { active: active, contentActive: contentActive, weekKey: weekKey, weekInfo: weekInfo, range: clientTimelineHomeRange(), crono: crono, tasks: tasks, open: open, overdue: overdue, noOwner: noOwner, approvals: approvals, scheduled: scheduled, published: published, critical: critical };
 }
 
 function clientTimelineHomeClientRow(item, kind) {
@@ -31342,7 +31411,7 @@ function clientTimelineHomeClientRow(item, kind) {
   var label = (item.labels || []).slice(0, 2).join(' · ') || (kind || 'timeline');
   var meta = clientTimelineClientMeta(key);
   if (!clientTimelineIsOperationalClient(meta)) return '';
-  return '<div class="ctl-home-row" onclick="clientTimelineSelectClient(' + ctlJsArg(key) + ')">' +
+  return '<div class="ctl-home-row" onclick="clientTimelineOpenClientContent(' + ctlJsArg(key) + ')">' +
     '<div style="position:relative;flex-shrink:0">' + clientLogoAvatarHtml({ slug:key, name:item.name || meta.name || key, logo_url: meta.logo_url || meta.logoUrl || meta.logo }, 'ctl-home-logo') +
       '<span class="ctl-home-score ' + scoreCls + '" style="position:absolute;right:-7px;bottom:-7px;width:22px;height:22px;border-radius:999px;font-size:.58rem">' + ctlEsc(String(item.score || '!')) + '</span></div>' +
     '<div><strong>' + ctlEsc(item.name || meta.name || key || 'Cliente') + '</strong><small>' + ctlEsc(label) + '</small></div>' +
@@ -31361,7 +31430,7 @@ function clientTimelineHomeTaskRow(task) {
   var media = task._creativeUrl
     ? '<div class="ctl-home-logo has-logo">' + (isVideo ? '<video src="' + ctlEsc(task._creativeUrl) + '" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>' : '<img class="client-logo-img" src="' + ctlEsc(task._creativeUrl) + '" loading="lazy" onerror="clientLogoFallback(this)" data-fallback="POST">') + '</div>'
     : '<div class="ctl-home-score ' + (st === 'published' ? '' : 'warn') + '"><span class="mso">' + (st === 'published' ? 'task_alt' : st === 'scheduled' ? 'calendar_today' : 'pending_actions') + '</span></div>';
-  return '<div class="ctl-home-row" onclick="' + (key ? 'clientTimelineSelectClient(' + ctlJsArg(key) + ')' : 'ctOpenModal(' + ctlJsArg(task.id) + ')') + '">' +
+  return '<div class="ctl-home-row" onclick="' + (key ? 'clientTimelineOpenClientContent(' + ctlJsArg(key) + ')' : 'ctOpenModal(' + ctlJsArg(task.id) + ')') + '">' +
     media +
     '<div><strong>' + ctlEsc(meta.name || key || 'Sem cliente') + '</strong><small>' + ctlEsc((task.due_date || 'sem data') + ' · ' + (task.name || 'Task')) + '</small></div>' +
     '<span class="ctl-home-chip ' + chipCls + '">' + chip + '</span>' +
@@ -31377,10 +31446,11 @@ function clientTimelineRenderHome() {
   if (!stats || !stages || !next || !ai) return;
   var snap = clientTimelineHomeSnapshot();
   var active = snap.active;
+  var contentActive = snap.contentActive || [];
   var weekPosts = snap.scheduled.length + snap.published.length;
   stats.innerHTML = [
     ['Clientes ativos', active.length, 'Starken operacional'],
-    ['Cronos pendentes', snap.crono.pending, snap.crono.sent + '/' + active.length + ' enviados'],
+    ['Cronos pendentes', snap.crono.pending, snap.crono.sent + '/' + contentActive.length + ' enviados'],
     ['Posts da semana', weekPosts, snap.published.length + ' pub · ' + snap.scheduled.length + ' agend'],
     ['Aguardando aprovação', snap.approvals.length, 'revisão/cliente'],
     ['Atrasados', snap.overdue.length, 'precisam ação'],
@@ -31388,9 +31458,21 @@ function clientTimelineRenderHome() {
   ].map(function(item) {
     return '<div class="ctl-stat"><small>' + ctlEsc(item[2]) + '</small><strong>' + ctlEsc(item[1]) + '</strong><small>' + ctlEsc(item[0]) + '</small></div>';
   }).join('');
-  var sentPct = active.length ? Math.round((snap.crono.sent / active.length) * 100) : 0;
+  var sentPct = contentActive.length ? Math.round((snap.crono.sent / contentActive.length) * 100) : 0;
   var weeklyDone = snap.tasks.length ? Math.round(((snap.published.length + snap.scheduled.length) / snap.tasks.length) * 100) : 0;
-  var cronoRows = snap.crono.rows.filter(function(r) { return r.cronoStatus !== 2; }).slice(0, 8).map(function(r) {
+  var cronoFilters = '<div class="ctl-home-filterbar">' +
+    '<button class="ctl-home-chip' + (_ctlHomeCronoFilter === 'all' ? ' active' : '') + '" onclick="event.stopPropagation();clientTimelineHomeSetCronoFilter(&quot;all&quot;)">Todos ' + snap.crono.rows.length + '</button>' +
+    '<button class="ctl-home-chip' + (_ctlHomeCronoFilter === 'pending' ? ' active' : '') + '" onclick="event.stopPropagation();clientTimelineHomeSetCronoFilter(&quot;pending&quot;)">Pendentes ' + snap.crono.pending + '</button>' +
+    '<button class="ctl-home-chip' + (_ctlHomeCronoFilter === 'generated' ? ' active' : '') + '" onclick="event.stopPropagation();clientTimelineHomeSetCronoFilter(&quot;generated&quot;)">Gerados ' + snap.crono.generated + '</button>' +
+    '<button class="ctl-home-chip' + (_ctlHomeCronoFilter === 'sent' ? ' active' : '') + '" onclick="event.stopPropagation();clientTimelineHomeSetCronoFilter(&quot;sent&quot;)">Enviados ' + snap.crono.sent + '</button>' +
+  '</div>';
+  var cronoList = snap.crono.rows.filter(function(r) {
+    if (_ctlHomeCronoFilter === 'sent') return r.cronoStatus === 2;
+    if (_ctlHomeCronoFilter === 'generated') return r.cronoStatus >= 1 && r.cronoStatus !== 2;
+    if (_ctlHomeCronoFilter === 'pending') return !r.cronoStatus;
+    return true;
+  });
+  var cronoRows = cronoList.slice(0, 10).map(function(r) {
     var label = r.cronoStatus >= 1 ? 'Gerado, falta enviar' : 'Pendente';
     var cls = r.cronoStatus >= 1 ? 'warn' : 'bad';
     var actions = '';
@@ -31404,15 +31486,13 @@ function clientTimelineRenderHome() {
     } else if (r.metaKey) {
       actions += '<button class="ctl-home-chip bad" onclick="event.stopPropagation();cronogramaFromSchedule(' + ctlJsArg(r.metaKey) + ',' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')">Gerar</button>';
     }
-    var rowClick = r.metaKey
-      ? 'cronogramaFromSchedule(' + ctlJsArg(r.metaKey) + ',' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')'
-      : 'clientTimelineSelectClient(' + ctlJsArg(r.id) + ')';
+    var rowClick = r.metaKey ? 'clientTimelineOpenClientContent(' + ctlJsArg(r.metaKey || r.id) + ')' : 'clientTimelineOpenClientContent(' + ctlJsArg(r.id) + ')';
     return '<div class="ctl-home-row" onclick="' + rowClick + '">' +
       clientLogoAvatarHtml({ slug: r.metaKey || r.id, name: r.name, logo_url: r.logo_url || r.logoUrl || r.logo }, 'ctl-home-logo') +
       '<div><strong>' + ctlEsc(r.name) + '</strong><small>' + ctlEsc(r.company + ' · ' + label) + '</small></div>' +
       '<div style="display:flex;align-items:center;gap:6px;margin-left:auto">' + actions + '<span class="ctl-home-chip ' + cls + '">' + label + '</span></div>' +
     '</div>';
-  }).join('') || '<div class="ctl-home-empty"><span class="mso">task_alt</span><br>Todos os cronogramas da semana foram enviados.</div>';
+  }).join('') || '<div class="ctl-home-empty"><span class="mso">task_alt</span><br>' + (contentActive.length ? 'Nenhum cronograma neste filtro.' : 'Nenhum cliente com conteúdo nesta semana.') + '</div>';
   var criticalRows = snap.critical.slice(0, 8).map(function(c) { return clientTimelineHomeClientRow(c, 'atenção'); }).filter(Boolean).join('') || '<div class="ctl-home-empty">Nenhum cliente crítico neste momento.</div>';
   var postRows = snap.tasks.filter(function(t) {
     var st = clientTimelineHomeTaskStatus(t);
@@ -31420,39 +31500,62 @@ function clientTimelineRenderHome() {
   }).sort(function(a,b) { return String(a.due_date || '').localeCompare(String(b.due_date || '')); }).slice(0, 8).map(clientTimelineHomeTaskRow).filter(Boolean).join('') || '<div class="ctl-home-empty">' + (_ctlHomeLoading ? 'Carregando posts da semana...' : 'Nenhum post agendado ou publicado nesta semana.') + '</div>';
   stages.innerHTML = '<div class="ctl-home-grid">' +
     '<section class="ctl-home-card"><h3><span class="mso">monitoring</span> Saúde operacional</h3><div class="ctl-home-progress">' +
-      '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Cronogramas enviados</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + sentPct + '%"></div></div><div class="ctl-home-progress-meta">' + snap.crono.sent + '/' + active.length + '</div></div>' +
+      '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Cronogramas enviados</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + sentPct + '%"></div></div><div class="ctl-home-progress-meta">' + snap.crono.sent + '/' + contentActive.length + '</div></div>' +
       '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Entrega semanal</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + weeklyDone + '%"></div></div><div class="ctl-home-progress-meta">' + (snap.published.length + snap.scheduled.length) + '/' + snap.tasks.length + '</div></div>' +
       '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Aprovações abertas</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + Math.min(100, snap.approvals.length * 12) + '%;background:linear-gradient(90deg,#fbbf24,#ef4444)"></div></div><div class="ctl-home-progress-meta">' + snap.approvals.length + '</div></div>' +
     '</div></section>' +
     '<section class="ctl-home-card"><h3><span class="mso">priority_high</span> Clientes que precisam de atenção</h3><div class="ctl-home-list">' + criticalRows + '</div></section>' +
-    '<section class="ctl-home-card"><h3><span class="mso">calendar_month</span> Cronogramas da semana</h3><div class="ctl-home-list">' + cronoRows + '</div></section>' +
+    '<section class="ctl-home-card"><div class="ctl-home-toolbar"><h3 style="margin:0"><span class="mso">calendar_month</span> Cronogramas da semana</h3><div class="ctl-home-weeknav"><button class="ctl-home-chip" onclick="event.stopPropagation();clientTimelineHomeNavWeek(-1)">‹</button><span class="ctl-home-week-label">' + ctlEsc(snap.weekInfo.label || snap.weekKey) + '</span><button class="ctl-home-chip" onclick="event.stopPropagation();clientTimelineHomeNavWeek(1)">›</button>' + (snap.weekKey !== ((typeof _dashGetCurrentWeekKey === 'function') ? _dashGetCurrentWeekKey() : snap.weekKey) ? '<button class="ctl-home-chip ok" onclick="event.stopPropagation();clientTimelineHomeResetWeek()">Atual</button>' : '') + '</div></div>' + cronoFilters + '<div class="ctl-home-list">' + cronoRows + '</div></section>' +
     '<section class="ctl-home-card"><h3><span class="mso">event_available</span> Agendamentos e publicações</h3><div class="ctl-home-list">' + postRows + '</div></section>' +
   '</div>';
   var actions = [];
   snap.crono.rows.filter(function(r) { return r.cronoStatus !== 2; }).slice(0, 4).forEach(function(r) { actions.push({ title:'Cronograma · ' + r.name, text:(r.cronoStatus >= 1 ? 'Enviar cronograma gerado' : 'Gerar cronograma pendente'), key:r.metaKey || r.id }); });
   snap.overdue.slice(0, 3).forEach(function(t) { actions.push({ title:t.name || 'Task atrasada', text:(t.assignee || 'Sem responsável') + ' · ' + (t.due_date || 'sem data'), key:clientTimelineTaskClientKey(t) }); });
   next.innerHTML = actions.length ? actions.slice(0, 8).map(function(a) {
-    return '<div class="ctl-next-item" onclick="clientTimelineSelectClient(' + ctlJsArg(a.key) + ')" style="cursor:pointer"><strong>' + ctlEsc(a.title) + '</strong><small>' + ctlEsc(a.text) + '</small></div>';
+    return '<div class="ctl-next-item" onclick="clientTimelineOpenClientContent(' + ctlJsArg(a.key) + ')" style="cursor:pointer"><strong>' + ctlEsc(a.title) + '</strong><small>' + ctlEsc(a.text) + '</small></div>';
   }).join('') : '<div class="ctl-empty">Nenhuma ação crítica agora.</div>';
-  ai.innerHTML = '<div class="ctl-next-item"><strong>Visão geral · ' + (snap.overdue.length ? 'Atenção' : 'OK') + '</strong><small>' + ctlEsc('Base Starken operacional: ' + active.length + ' clientes. Há ' + snap.crono.pending + ' cronogramas pendentes, ' + snap.overdue.length + ' tasks atrasadas e ' + snap.approvals.length + ' aprovações abertas.') + '</small></div>' +
+  ai.innerHTML = '<div class="ctl-next-item"><strong>Visão geral · ' + (snap.overdue.length ? 'Atenção' : 'OK') + '</strong><small>' + ctlEsc('Semana: ' + (snap.weekInfo.label || snap.weekKey) + '. Base Starken operacional: ' + active.length + ' clientes; ' + contentActive.length + ' com conteúdo na semana. Há ' + snap.crono.pending + ' cronogramas pendentes, ' + snap.overdue.length + ' tasks atrasadas e ' + snap.approvals.length + ' aprovações abertas.') + '</small></div>' +
     '<button class="ctl-btn primary" style="width:100%;margin-top:8px" onclick="clientTimelineHomeAnalyze()">Gerar análise geral</button>';
   if (notes) notes.innerHTML = '<div class="ctl-empty" style="padding:12px">Selecione um cliente para notas rápidas individuais.</div>';
 }
 
-function clientTimelineHomeAnalyze() {
+async function clientTimelineHomeAnalyze() {
   var snap = clientTimelineHomeSnapshot();
   var msg = 'Lurdinha - visão geral da operação\n\n' +
     '- Clientes Starken operacionais: ' + snap.active.length + '\n' +
+    '- Semana analisada: ' + ((snap.weekInfo && snap.weekInfo.label) || snap.weekKey || 'atual') + '\n' +
+    '- Clientes com conteúdo na semana: ' + ((snap.contentActive || []).length) + '\n' +
     '- Cronogramas pendentes: ' + snap.crono.pending + '\n' +
-    '- Cronogramas enviados: ' + snap.crono.sent + '/' + snap.active.length + '\n' +
+    '- Cronogramas enviados: ' + snap.crono.sent + '/' + ((snap.contentActive || []).length) + '\n' +
     '- Posts agendados/publicados da semana: ' + (snap.published.length + snap.scheduled.length) + ' (' + snap.published.length + ' publicados, ' + snap.scheduled.length + ' agendados)\n' +
     '- Tasks atrasadas: ' + snap.overdue.length + '\n' +
     '- Aprovações abertas: ' + snap.approvals.length + '\n' +
     '- Sem responsável: ' + snap.noOwner.length + '\n\n' +
     'Prioridade sugerida: resolver cronogramas pendentes, cobrar responsáveis de tasks atrasadas e fechar aprovações antes de abrir novas demandas.';
   try { navigator.clipboard && navigator.clipboard.writeText(msg); } catch(e) {}
-  if (typeof showToast === 'function') showToast('Análise geral da timeline copiada');
+  var notifyRes = null;
+  try { notifyRes = await clientTimelineNotifyLurdinhaAnalysis(msg, snap); } catch(e) { console.warn('[client-timeline] notify failed:', e); }
+  var notifyOk = !!(notifyRes && (notifyRes.telegram_sent || notifyRes.notifications_created));
+  if (typeof showToast === 'function') showToast(notifyOk ? 'Análise geral copiada e enviada para Will, Dante e Juan' : 'Análise geral copiada; Telegram pendente de configuração');
   return msg;
+}
+
+async function clientTimelineNotifyLurdinhaAnalysis(message, snap) {
+  if (typeof ctApi !== 'function') return null;
+  return ctApi('notify_timeline_analysis', {
+    recipients: ['Will', 'Dante', 'Juan'],
+    title: 'Lurdinha · análise geral da timeline',
+    message: message,
+    user: typeof ctGetUser === 'function' ? ctGetUser() : 'Lurdinha',
+    metadata: {
+      week_key: snap && snap.weekKey,
+      week_label: snap && snap.weekInfo && snap.weekInfo.label,
+      clients_with_content: snap && snap.contentActive ? snap.contentActive.length : 0,
+      overdue: snap ? snap.overdue.length : 0,
+      approvals: snap ? snap.approvals.length : 0,
+      pending_cronos: snap ? snap.crono.pending : 0
+    }
+  });
 }
 
 function clientTimelineRenderEmpty(message) {
@@ -31621,6 +31724,12 @@ async function clientTimelineAdvanceTask(taskId, status) {
 function clientTimelineOpenContent() {
   if (!_ctlClientSlug) return;
   sidebarSelectClient(_ctlClientSlug);
+}
+
+function clientTimelineOpenClientContent(slug) {
+  if (!slug) return;
+  _ctlClientSlug = slug;
+  sidebarSelectClient(slug);
 }
 
 function clientTimelineNotesKey() {
