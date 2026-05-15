@@ -11,7 +11,7 @@
 (function() {
   var OFFICE_GAME_PATH = '/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=4';
   window.STARKEN_OFFICE_GAME_PATH = OFFICE_GAME_PATH;
-  window.STARKEN_OS_BUILD = '20260514-1702-meta-bi-ad-creatives';
+  window.STARKEN_OS_BUILD = '20260515-1625-timeline-operacional-filtros';
 
   // Se por qualquer cache/clique antigo o Starken OS for carregado dentro do proprio iframe,
   // troca imediatamente para o escritorio real. Isso evita o efeito "menu dentro de menu".
@@ -30973,15 +30973,14 @@ function clientTimelineLoadClients() {
   var sel = document.getElementById('ctlClientSelect');
   if (!sel) return;
   var clients = typeof clientCentralGetClients === 'function' ? clientCentralGetClients() : [];
+  clients = clients.filter(clientTimelineIsOperationalClient);
   var html = '<option value="">Selecione o cliente...</option>';
-  var grouped = { starken: [], alpha: [] };
+  var grouped = { starken: [] };
   clients.forEach(function(c) {
-    if (c.tenant === 'alpha') grouped.alpha.push(c);
-    else grouped.starken.push(c);
+    grouped.starken.push(c);
   });
   [
     { key:'starken', label:'Starken Performance' },
-    { key:'alpha', label:'Alpha Assessoria' },
   ].forEach(function(group) {
     if (!grouped[group.key].length) return;
     html += '<optgroup label="' + ctlEsc(group.label) + '">';
@@ -31100,21 +31099,41 @@ var _ctlHomeTasks = [];
 var _ctlHomeLoaded = false;
 var _ctlHomeLoading = false;
 
+function clientTimelineIsOperationalClient(input) {
+  var c = typeof input === 'object' && input ? input : {};
+  var key = c.slug || c.metaKey || c.key || c.id || input || '';
+  var tenant = c.tenant || (c.company === 'Alpha' ? 'alpha' : 'starken');
+  if (tenant === 'alpha') return false;
+  var statuses = typeof ctGetClientStatuses === 'function' ? ctGetClientStatuses() : {};
+  var slugName = typeof ccSlugify === 'function' ? ccSlugify(c.name || '') : '';
+  var status = c.status || statuses[key] || statuses[c.id || ''] || statuses[slugName] || 'ativo';
+  if (/arquivado|desativado|inactive|inativo/i.test(String(status || ''))) return false;
+  if (typeof ctIsClientOperational === 'function' && key && !ctIsClientOperational(key)) return false;
+  return true;
+}
+
+function clientTimelineClientMeta(key) {
+  var meta = (typeof _metaClients !== 'undefined' && _metaClients && _metaClients[key]) ? Object.assign({ slug:key }, _metaClients[key]) : null;
+  if (meta) return meta;
+  var clients = typeof clientCentralGetClients === 'function' ? clientCentralGetClients() : [];
+  return clients.find(function(c) { return c.slug === key || c.id === key || c.key === key; }) || { slug:key, name:key };
+}
+
 function clientTimelineActiveClients() {
   var list = [];
   if (typeof data !== 'undefined' && data.clients && data.clients.length) {
-    list = data.clients.filter(function(c) { return c && c.active && (typeof ctIsClientOperational !== 'function' || ctIsClientOperational(c.id)); }).map(function(c) {
+    list = data.clients.filter(function(c) { return c && c.active; }).map(function(c) {
       var tenant = c.company === 'Alpha' ? 'alpha' : 'starken';
       var metaKey = (typeof findMetaClientKey === 'function') ? findMetaClientKey(c.name, tenant) : c.id;
-      return { id: c.id, metaKey: metaKey || c.id, name: c.name || c.id, company: c.company || (tenant === 'alpha' ? 'Alpha' : 'Starken'), tenant: tenant };
-    });
+      return { id: c.id, metaKey: metaKey || c.id, slug: metaKey || c.id, name: c.name || c.id, company: c.company || 'Starken', tenant: tenant };
+    }).filter(clientTimelineIsOperationalClient);
   }
   if (!list.length && typeof _metaClients !== 'undefined') {
     Object.keys(_metaClients || {}).forEach(function(key) {
       var c = _metaClients[key] || {};
-      if (typeof ctIsClientOperational === 'function' && !ctIsClientOperational(key)) return;
       var tenant = c.tenant === 'alpha' ? 'alpha' : 'starken';
-      list.push({ id: key, metaKey: key, name: c.name || key, company: tenant === 'alpha' ? 'Alpha' : 'Starken', tenant: tenant });
+      var item = { id: key, metaKey: key, slug: key, name: c.name || key, company: 'Starken', tenant: tenant, status: c.status };
+      if (clientTimelineIsOperationalClient(item)) list.push(item);
     });
   }
   return list.sort(function(a,b) { return a.name.localeCompare(b.name, 'pt-BR'); });
@@ -31167,12 +31186,37 @@ async function clientTimelineRefreshHome(force) {
     if (typeof _ensureGroupToClient === 'function') {
       try { groupMap = await _ensureGroupToClient(); } catch(e) { groupMap = {}; }
     }
-    _ctlHomeTasks = (tasks || []).map(function(t) {
+    var mapped = (tasks || []).map(function(t) {
       var copy = Object.assign({}, t);
       copy._clientKey = groupMap[t.group_id] || t.client_key || t.client_id || '';
       return copy;
     }).filter(function(t) {
-      return !t._clientKey || typeof ctIsClientOperational !== 'function' || ctIsClientOperational(t._clientKey);
+      return !!t._clientKey && clientTimelineIsOperationalClient(clientTimelineClientMeta(t._clientKey));
+    });
+    var taskIds = mapped.map(function(t) { return t.id; }).filter(Boolean);
+    var attachmentsByTask = {};
+    if (taskIds.length && typeof _sbQuery === 'function') {
+      try {
+        var atts = await _sbQuery('content_attachments', {
+          select: 'id,task_id,file_url,file_type,category,format_type,created_at',
+          filters: ['task_id=in.(' + taskIds.join(',') + ')', 'category=in.(creative,final)'],
+          order: 'created_at.desc',
+          limit: 1000
+        }) || [];
+        var priority = { final: 2, creative: 1 };
+        atts.forEach(function(a) {
+          var current = attachmentsByTask[a.task_id];
+          if (!current || (priority[a.category] || 0) > (priority[current.category] || 0)) attachmentsByTask[a.task_id] = a;
+        });
+      } catch(attErr) { console.warn('[client-timeline-home] attachments failed:', attErr); }
+    }
+    _ctlHomeTasks = mapped.map(function(t) {
+      var a = attachmentsByTask[t.id];
+      if (a) {
+        t._creativeUrl = a.file_url || '';
+        t._creativeType = a.file_type || '';
+      }
+      return t;
     });
     _ctlHomeLoaded = true;
   } catch(e) {
@@ -31214,7 +31258,8 @@ function clientTimelineHomeSnapshot() {
   var byClient = {};
   function addRisk(key, weight, label) {
     if (!key) return;
-    var meta = (typeof _metaClients !== 'undefined' && _metaClients[key]) ? _metaClients[key] : {};
+    var meta = clientTimelineClientMeta(key);
+    if (!clientTimelineIsOperationalClient(meta)) return;
     if (!byClient[key]) byClient[key] = { key:key, name: meta.name || key, score:0, labels:[] };
     byClient[key].score += weight;
     if (label && byClient[key].labels.indexOf(label) < 0) byClient[key].labels.push(label);
@@ -31231,23 +31276,29 @@ function clientTimelineHomeClientRow(item, kind) {
   var scoreCls = item.score >= 8 ? 'bad' : item.score >= 4 ? 'warn' : '';
   var key = item.key || item.metaKey || item.id || '';
   var label = (item.labels || []).slice(0, 2).join(' · ') || (kind || 'timeline');
-  var meta = (typeof _metaClients !== 'undefined' && _metaClients[key]) ? _metaClients[key] : {};
-  var tenant = meta.tenant === 'alpha' ? 'Alpha' : 'Starken';
+  var meta = clientTimelineClientMeta(key);
+  if (!clientTimelineIsOperationalClient(meta)) return '';
   return '<div class="ctl-home-row" onclick="clientTimelineSelectClient(' + ctlJsArg(key) + ')">' +
-    '<div class="ctl-home-score ' + scoreCls + '">' + ctlEsc(String(item.score || '!')) + '</div>' +
-    '<div><strong>' + ctlEsc(item.name || key || 'Cliente') + '</strong><small>' + ctlEsc(tenant + ' · ' + label) + '</small></div>' +
+    '<div style="position:relative;flex-shrink:0">' + clientLogoAvatarHtml({ slug:key, name:item.name || meta.name || key, logo_url: meta.logo_url || meta.logoUrl || meta.logo }, 'ctl-home-logo') +
+      '<span class="ctl-home-score ' + scoreCls + '" style="position:absolute;right:-7px;bottom:-7px;width:22px;height:22px;border-radius:999px;font-size:.58rem">' + ctlEsc(String(item.score || '!')) + '</span></div>' +
+    '<div><strong>' + ctlEsc(item.name || meta.name || key || 'Cliente') + '</strong><small>' + ctlEsc(label) + '</small></div>' +
     '<span class="mso" style="color:var(--text-muted)">chevron_right</span>' +
   '</div>';
 }
 
 function clientTimelineHomeTaskRow(task) {
   var key = clientTimelineTaskClientKey(task);
-  var meta = (typeof _metaClients !== 'undefined' && _metaClients[key]) ? _metaClients[key] : {};
+  var meta = clientTimelineClientMeta(key);
+  if (key && !clientTimelineIsOperationalClient(meta)) return '';
   var st = clientTimelineHomeTaskStatus(task);
   var chipCls = st === 'published' ? 'ok' : st === 'scheduled' ? 'warn' : '';
   var chip = st === 'published' ? 'Publicado' : st === 'scheduled' ? 'Agendado' : 'Aberto';
+  var isVideo = /video/i.test(String(task._creativeType || ''));
+  var media = task._creativeUrl
+    ? '<div class="ctl-home-logo has-logo">' + (isVideo ? '<video src="' + ctlEsc(task._creativeUrl) + '" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>' : '<img class="client-logo-img" src="' + ctlEsc(task._creativeUrl) + '" loading="lazy" onerror="clientLogoFallback(this)" data-fallback="POST">') + '</div>'
+    : '<div class="ctl-home-score ' + (st === 'published' ? '' : 'warn') + '"><span class="mso">' + (st === 'published' ? 'task_alt' : st === 'scheduled' ? 'calendar_today' : 'pending_actions') + '</span></div>';
   return '<div class="ctl-home-row" onclick="' + (key ? 'clientTimelineSelectClient(' + ctlJsArg(key) + ')' : 'ctOpenModal(' + ctlJsArg(task.id) + ')') + '">' +
-    '<div class="ctl-home-score ' + (st === 'published' ? '' : 'warn') + '"><span class="mso">' + (st === 'published' ? 'task_alt' : st === 'scheduled' ? 'calendar_today' : 'pending_actions') + '</span></div>' +
+    media +
     '<div><strong>' + ctlEsc(meta.name || key || 'Sem cliente') + '</strong><small>' + ctlEsc((task.due_date || 'sem data') + ' · ' + (task.name || 'Task')) + '</small></div>' +
     '<span class="ctl-home-chip ' + chipCls + '">' + chip + '</span>' +
   '</div>';
@@ -31262,11 +31313,9 @@ function clientTimelineRenderHome() {
   if (!stats || !stages || !next || !ai) return;
   var snap = clientTimelineHomeSnapshot();
   var active = snap.active;
-  var starkeCount = active.filter(function(c) { return c.tenant !== 'alpha'; }).length;
-  var alphaCount = active.filter(function(c) { return c.tenant === 'alpha'; }).length;
   var weekPosts = snap.scheduled.length + snap.published.length;
   stats.innerHTML = [
-    ['Clientes ativos', active.length, starkeCount + ' Starken · ' + alphaCount + ' Alpha'],
+    ['Clientes ativos', active.length, 'Starken operacional'],
     ['Cronos pendentes', snap.crono.pending, snap.crono.sent + '/' + active.length + ' enviados'],
     ['Posts da semana', weekPosts, snap.published.length + ' pub · ' + snap.scheduled.length + ' agend'],
     ['Aguardando aprovação', snap.approvals.length, 'revisão/cliente'],
@@ -31300,8 +31349,11 @@ function clientTimelineRenderHome() {
       '<div style="display:flex;align-items:center;gap:6px;margin-left:auto">' + actions + '<span class="ctl-home-chip ' + cls + '">' + label + '</span></div>' +
     '</div>';
   }).join('') || '<div class="ctl-home-empty"><span class="mso">task_alt</span><br>Todos os cronogramas da semana foram enviados.</div>';
-  var criticalRows = snap.critical.slice(0, 8).map(function(c) { return clientTimelineHomeClientRow(c, 'atenção'); }).join('') || '<div class="ctl-home-empty">Nenhum cliente crítico neste momento.</div>';
-  var postRows = snap.tasks.slice().sort(function(a,b) { return String(a.due_date || '').localeCompare(String(b.due_date || '')); }).slice(0, 8).map(clientTimelineHomeTaskRow).join('') || '<div class="ctl-home-empty">' + (_ctlHomeLoading ? 'Carregando posts da semana...' : 'Nenhum post mapeado para esta semana.') + '</div>';
+  var criticalRows = snap.critical.slice(0, 8).map(function(c) { return clientTimelineHomeClientRow(c, 'atenção'); }).filter(Boolean).join('') || '<div class="ctl-home-empty">Nenhum cliente crítico neste momento.</div>';
+  var postRows = snap.tasks.filter(function(t) {
+    var st = clientTimelineHomeTaskStatus(t);
+    return st === 'scheduled' || st === 'published';
+  }).sort(function(a,b) { return String(a.due_date || '').localeCompare(String(b.due_date || '')); }).slice(0, 8).map(clientTimelineHomeTaskRow).filter(Boolean).join('') || '<div class="ctl-home-empty">' + (_ctlHomeLoading ? 'Carregando posts da semana...' : 'Nenhum post agendado ou publicado nesta semana.') + '</div>';
   stages.innerHTML = '<div class="ctl-home-grid">' +
     '<section class="ctl-home-card"><h3><span class="mso">monitoring</span> Saúde operacional</h3><div class="ctl-home-progress">' +
       '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Cronogramas enviados</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + sentPct + '%"></div></div><div class="ctl-home-progress-meta">' + snap.crono.sent + '/' + active.length + '</div></div>' +
@@ -31318,7 +31370,7 @@ function clientTimelineRenderHome() {
   next.innerHTML = actions.length ? actions.slice(0, 8).map(function(a) {
     return '<div class="ctl-next-item" onclick="clientTimelineSelectClient(' + ctlJsArg(a.key) + ')" style="cursor:pointer"><strong>' + ctlEsc(a.title) + '</strong><small>' + ctlEsc(a.text) + '</small></div>';
   }).join('') : '<div class="ctl-empty">Nenhuma ação crítica agora.</div>';
-  ai.innerHTML = '<div class="ctl-next-item"><strong>Visão geral · ' + (snap.overdue.length ? 'Atenção' : 'OK') + '</strong><small>' + ctlEsc('Há ' + snap.crono.pending + ' cronogramas pendentes, ' + snap.overdue.length + ' tasks atrasadas e ' + snap.approvals.length + ' aprovações abertas.') + '</small></div>' +
+  ai.innerHTML = '<div class="ctl-next-item"><strong>Visão geral · ' + (snap.overdue.length ? 'Atenção' : 'OK') + '</strong><small>' + ctlEsc('Base Starken operacional: ' + active.length + ' clientes. Há ' + snap.crono.pending + ' cronogramas pendentes, ' + snap.overdue.length + ' tasks atrasadas e ' + snap.approvals.length + ' aprovações abertas.') + '</small></div>' +
     '<button class="ctl-btn primary" style="width:100%;margin-top:8px" onclick="clientTimelineHomeAnalyze()">Gerar análise geral</button>';
   if (notes) notes.innerHTML = '<div class="ctl-empty" style="padding:12px">Selecione um cliente para notas rápidas individuais.</div>';
 }
@@ -31326,10 +31378,10 @@ function clientTimelineRenderHome() {
 function clientTimelineHomeAnalyze() {
   var snap = clientTimelineHomeSnapshot();
   var msg = 'Lurdinha - visão geral da operação\n\n' +
-    '- Clientes ativos: ' + snap.active.length + '\n' +
+    '- Clientes Starken operacionais: ' + snap.active.length + '\n' +
     '- Cronogramas pendentes: ' + snap.crono.pending + '\n' +
     '- Cronogramas enviados: ' + snap.crono.sent + '/' + snap.active.length + '\n' +
-    '- Posts da semana: ' + snap.tasks.length + ' (' + snap.published.length + ' publicados, ' + snap.scheduled.length + ' agendados)\n' +
+    '- Posts agendados/publicados da semana: ' + (snap.published.length + snap.scheduled.length) + ' (' + snap.published.length + ' publicados, ' + snap.scheduled.length + ' agendados)\n' +
     '- Tasks atrasadas: ' + snap.overdue.length + '\n' +
     '- Aprovações abertas: ' + snap.approvals.length + '\n' +
     '- Sem responsável: ' + snap.noOwner.length + '\n\n' +
