@@ -22,6 +22,20 @@ const { validateTenant, getClient } = require('./_lib/tenants');
 
 // ─── GET: Listar campanhas ────────────────────────────────────────────────────
 
+async function graphGetAll(path, params) {
+  const first = await graphGet(path, params);
+  let data = first.data || [];
+  let nextUrl = first.paging && first.paging.next;
+  while (nextUrl) {
+    const pageRes = await fetch(nextUrl);
+    const pageData = await pageRes.json();
+    if (pageData.error) break;
+    data = data.concat(pageData.data || []);
+    nextUrl = pageData.paging && pageData.paging.next;
+  }
+  return data;
+}
+
 async function handleGet(req, res) {
   const tenant = await validateTenant(req, res);
   if (!tenant) return;
@@ -46,27 +60,28 @@ async function handleGet(req, res) {
 
     // ── Lista de campanhas ──
     const params = {
-      fields: 'id,name,objective,status,daily_budget,lifetime_budget,bid_strategy,buying_type,special_ad_categories,created_time,updated_time',
+      fields: 'id,name,objective,status,effective_status,daily_budget,lifetime_budget,bid_strategy,buying_type,special_ad_categories,created_time,updated_time',
       limit: '100',
     };
     if (statusFilter) {
       params.effective_status = JSON.stringify([statusFilter]);
+    } else {
+      params.effective_status = JSON.stringify(['ACTIVE', 'PAUSED', 'ARCHIVED']);
     }
 
-    const result = await graphGet(`/${adAccountId}/campaigns`, params);
-    const campaigns = result.data || [];
+    const campaigns = await graphGetAll(`/${adAccountId}/campaigns`, params);
 
     // Para cada campanha, buscar ad sets
     const enriched = [];
     for (const campaign of campaigns) {
-      const adsetResult = await graphGet(`/${campaign.id}/adsets`, {
-        fields: 'id,name,status,daily_budget,lifetime_budget,billing_event,optimization_goal,bid_amount,targeting,promoted_object,start_time,end_time',
-        limit: '50',
+      const adsets = await graphGetAll(`/${campaign.id}/adsets`, {
+        fields: 'id,name,status,effective_status,daily_budget,lifetime_budget,billing_event,optimization_goal,bid_amount,targeting,promoted_object,start_time,end_time',
+        limit: '100',
       });
 
       enriched.push({
         ...campaign,
-        adsets: adsetResult.data || [],
+        adsets,
       });
     }
 
@@ -89,23 +104,21 @@ async function handleGet(req, res) {
 async function getDeepCampaign(res, adAccountId, campaignId) {
   // 1. Campaign details
   const campaign = await graphGet(`/${campaignId}`, {
-    fields: 'id,name,objective,status,daily_budget,lifetime_budget,bid_strategy,buying_type,special_ad_categories,created_time',
+    fields: 'id,name,objective,status,effective_status,daily_budget,lifetime_budget,bid_strategy,buying_type,special_ad_categories,created_time',
   });
 
   // 2. Ad Sets
-  const adsetResult = await graphGet(`/${campaignId}/adsets`, {
-    fields: 'id,name,status,daily_budget,lifetime_budget,billing_event,optimization_goal,bid_amount,targeting,promoted_object,destination_type,start_time,end_time',
-    limit: '50',
+  const adsets = await graphGetAll(`/${campaignId}/adsets`, {
+    fields: 'id,name,status,effective_status,daily_budget,lifetime_budget,billing_event,optimization_goal,bid_amount,targeting,promoted_object,destination_type,start_time,end_time',
+    limit: '100',
   });
-  const adsets = adsetResult.data || [];
 
   // 3. Ads for each ad set (with creative details)
   for (const adset of adsets) {
-    const adsResult = await graphGet(`/${adset.id}/ads`, {
-      fields: 'id,name,status,creative{id,name,title,body,image_url,image_hash,video_id,object_story_spec,asset_feed_spec,url_tags,thumbnail_url,effective_object_story_id}',
-      limit: '50',
+    adset.ads = await graphGetAll(`/${adset.id}/ads`, {
+      fields: 'id,name,status,effective_status,creative{id,name,title,body,image_url,image_hash,video_id,object_story_spec,asset_feed_spec,url_tags,thumbnail_url,effective_object_story_id}',
+      limit: '100',
     });
-    adset.ads = adsResult.data || [];
   }
 
   return res.status(200).json({

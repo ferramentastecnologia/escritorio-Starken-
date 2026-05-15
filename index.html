@@ -11,7 +11,7 @@
 (function() {
   var OFFICE_GAME_PATH = '/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=4';
   window.STARKEN_OFFICE_GAME_PATH = OFFICE_GAME_PATH;
-  window.STARKEN_OS_BUILD = '20260515-1625-timeline-operacional-filtros';
+  window.STARKEN_OS_BUILD = '20260515-1645-meta-bi-structure-campaigns';
 
   // Se por qualquer cache/clique antigo o Starken OS for carregado dentro do proprio iframe,
   // troca imediatamente para o escritorio real. Isso evita o efeito "menu dentro de menu".
@@ -20596,12 +20596,14 @@ function metaBiRenderPdfCampaignHierarchy(campaignRow, bundle, fmt, fmtN) {
       var meta = adMeta[String(row.ad_id || '')] || {};
       var image = meta.creativeUrl || '';
       var roasColor = row.roas >= 5 ? '#22c55e' : row.roas >= 2 ? '#f59e0b' : row.roas > 0 ? '#ef4444' : '#64748b';
+      var hasDelivery = (row.spend || row.reach || row.impressions || row.clicks || row.landingPageViews || row.conversions || row.revenue) > 0;
       html += '<div class="ad-row" style="display:grid;grid-template-columns:72px minmax(140px,1fr) auto;gap:10px;align-items:center;padding:10px 11px;background:#fff;border-top:1px solid #e2e8f0">'
         + '<div style="width:72px;height:72px;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center">'
         + (image ? '<img crossorigin="anonymous" referrerpolicy="no-referrer" src="' + esc(image) + '" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=&quot;none&quot;">' : '<span style="font-size:10px;color:#94a3b8">sem imagem</span>')
         + '</div>'
         + '<div style="min-width:0"><div style="font-size:13px;font-weight:800;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(row.ad_name || meta.name || 'Anúncio') + '</div>'
         + '<div style="display:inline-block;margin-top:5px;padding:2px 7px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:9px;text-transform:uppercase">' + esc(meta.status || 'sem status') + '</div>'
+        + '<div style="display:inline-block;margin-top:5px;margin-left:5px;padding:2px 7px;border-radius:999px;background:' + (hasDelivery ? '#ecfdf5;color:#047857' : '#fffbeb;color:#b45309') + ';font-size:9px;text-transform:uppercase">' + (hasDelivery ? 'Com entrega' : 'Sem entrega') + '</div>'
         + (meta.creativeName ? '<div style="margin-top:5px;color:#64748b;font-size:10px;line-height:1.3">Criativo: ' + esc(meta.creativeName) + '</div>' : '')
         + '</div>'
         + '<div style="display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap">'
@@ -20663,8 +20665,12 @@ async function metaBiGeneratePdfReport() {
     var roasText = row.roas > 0 ? row.roas.toFixed(2) + 'x' : '—';
     campaignRows += '<div style="padding:18px 20px;background:#fff;border-radius:10px;border-left:4px solid ' + badge.color + ';margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-      + '<div style="font-size:14px;font-weight:700;color:#1a1a2e">' + row.campaign_name + '</div>'
-      + '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:' + badge.color + ';color:#fff;padding:4px 10px;border-radius:4px">' + badge.badge + '</span>'
+      + '<div><div style="font-size:14px;font-weight:700;color:#1a1a2e">' + row.campaign_name + '</div>'
+      + (row._structureOnly ? '<div style="margin-top:4px;color:#b45309;font-size:10px;font-weight:800;text-transform:uppercase">Sem entrega no período selecionado</div>' : '')
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:6px">'
+      + (row.campaign_status ? '<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;border:1px solid #e2e8f0;color:#64748b;padding:3px 8px;border-radius:999px">' + esc(row.campaign_status) + '</span>' : '')
+      + '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:' + badge.color + ';color:#fff;padding:4px 10px;border-radius:4px">' + badge.badge + '</span></div>'
       + '</div>';
     campaignRows += metaBiRenderPdfCampaignHierarchy(row, hierarchyMap[row.campaign_id || row.campaign_name], fmt, fmtN);
     campaignRows += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;font-weight:800;margin:12px 0 10px">Consolidado da campanha</div>';
@@ -20887,6 +20893,54 @@ function metaBiExtractAction(actions, types) {
   return 0;
 }
 
+async function metaBiMergeCampaignStructureRows(clientKey, rows) {
+  var client = _metaBiState.allClients[clientKey];
+  var merged = (rows || []).slice();
+  if (!clientKey || !client) return merged;
+  try {
+    var res = await fetch(metaApiBase() + '/api/meta/campaigns?client=' + encodeURIComponent(clientKey));
+    var json = await res.json();
+    if (!res.ok || json.error) throw new Error(json.message || json.error || res.statusText);
+    var seen = {};
+    merged.forEach(function(row) {
+      if (row.campaign_id) seen[String(row.campaign_id)] = true;
+      if (row.campaign_name) seen['name:' + row.campaign_name] = true;
+    });
+    (json.campaigns || []).forEach(function(campaign) {
+      if (!campaign || (!campaign.id && !campaign.name)) return;
+      if (seen[String(campaign.id || '')] || seen['name:' + campaign.name]) return;
+      merged.push({
+        campaign_id: campaign.id || '',
+        campaign_name: campaign.name || 'Campanha sem nome',
+        campaign_status: campaign.effective_status || campaign.status || '',
+        _structureOnly: true,
+        _deliveryLabel: 'Sem entrega no período',
+        spend: 0,
+        impressions: 0,
+        reach: 0,
+        clicks: 0,
+        cpc: 0,
+        cpm: 0,
+        ctr: 0,
+        purchases: 0,
+        revenue: 0,
+        conversions: 0,
+        cpa: 0,
+        roas: 0,
+        ticket: 0,
+        addToCart: 0,
+        initiateCheckout: 0,
+        landingPageViews: 0,
+        linkClicks: 0,
+        costPerVisit: 0
+      });
+    });
+  } catch(e) {
+    console.warn('BI campaign structure unavailable:', e);
+  }
+  return merged;
+}
+
 async function metaBiFetchDashboardData(clientKey, preset) {
   var client = _metaBiState.allClients[clientKey];
   if (!client) return;
@@ -21002,6 +21056,8 @@ async function metaBiFetchDashboardData(clientKey, preset) {
       };
     });
 
+    rows = await metaBiMergeCampaignStructureRows(clientKey, rows);
+    if (requestSeq !== _metaBiState.fetchSeq) return;
     _metaBiState.dashboardData = rows;
     metaBiRenderPeriodDebug(_metaBiState.lastFetchMeta);
 
@@ -21171,8 +21227,12 @@ function metaBiGetInterpretation(row, badge) {
 
 	    html += '<div style="padding:18px;background:var(--card);border-radius:10px;box-shadow:var(--shadow);border-left:4px solid ' + badgeInfo.color + '">'
 	      + '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px">'
-	      + '<div style="flex:1"><div style="font-size:0.9rem;font-weight:700;color:var(--text)">' + row.campaign_name + '</div></div>'
-	      + '<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:' + badgeInfo.color + ';color:#fff;padding:4px 10px;border-radius:4px;white-space:nowrap;margin-left:8px">' + badgeInfo.badge + '</span>'
+	      + '<div style="flex:1"><div style="font-size:0.9rem;font-weight:700;color:var(--text)">' + row.campaign_name + '</div>'
+	      + (row._structureOnly ? '<div style="margin-top:5px;color:#f59e0b;font-size:0.72rem;font-weight:700"><span class="mso" style="font-size:14px">pause_circle</span> Sem entrega no período selecionado</div>' : '')
+	      + '</div>'
+	      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-left:8px">'
+	      + (row.campaign_status ? '<span style="font-size:0.62rem;font-weight:800;text-transform:uppercase;letter-spacing:0.35px;border:1px solid var(--border);color:var(--text-secondary);padding:3px 8px;border-radius:999px">' + esc(row.campaign_status) + '</span>' : '')
+	      + '<span style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:' + badgeInfo.color + ';color:#fff;padding:4px 10px;border-radius:4px;white-space:nowrap">' + badgeInfo.badge + '</span></div>'
 	      + '</div>';
 	    html += '<div id="' + creativeDomId + '" style="min-height:58px;margin:-4px 0 12px;display:flex;align-items:center;gap:8px;overflow-x:auto;color:var(--text-secondary);font-size:0.72rem">'
 	      + '<span class="mso" style="font-size:16px">image_search</span> Buscando criativos dos anúncios...'
@@ -21347,9 +21407,10 @@ function metaBiGetInterpretation(row, badge) {
 	      map[String(ad.id || '')] = {
 	        id: ad.id || '',
 	        name: ad.name || creative.name || 'Anúncio',
-	        status: ad.status || '',
+	        status: ad.effective_status || ad.status || '',
 	        adset_id: adset.id || '',
 	        adset_name: adset.name || '',
+	        adsetStatus: adset.effective_status || adset.status || '',
 	        creativeName: creative.name || '',
 	        creativeUrl: metaBiCreativeUrlFromCreative(creative),
 	        type: creative.video_id ? 'video' : 'image'
@@ -21422,6 +21483,7 @@ function metaBiGetInterpretation(row, badge) {
 	      var meta = adMeta[String(row.ad_id || '')] || {};
 	      var image = meta.creativeUrl;
 	      var roasColor = row.roas >= 5 ? '#22c55e' : row.roas >= 2 ? '#f59e0b' : row.roas > 0 ? '#ef4444' : 'var(--text-secondary)';
+	      var hasDelivery = (row.spend || row.reach || row.impressions || row.clicks || row.landingPageViews || row.conversions || row.revenue) > 0;
 	      html += '<div style="display:grid;grid-template-columns:96px minmax(180px,1fr) auto;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--border)">'
 	        + '<a href="' + esc(image || '#') + '" target="_blank" style="width:96px;height:96px;border-radius:10px;border:1px solid var(--border);background:var(--bg);overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative">'
 	        + (image ? '<img src="' + esc(image) + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=&quot;none&quot;">' : '<span class="mso" style="color:var(--text-secondary)">hide_image</span>')
@@ -21430,6 +21492,8 @@ function metaBiGetInterpretation(row, badge) {
 	        + '<div style="min-width:0"><div style="font-size:0.86rem;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(row.ad_name || meta.name || 'Anúncio') + '">' + esc(row.ad_name || meta.name || 'Anúncio') + '</div>'
 	        + '<div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;color:var(--text-secondary);font-size:0.7rem">'
 	        + '<span style="border:1px solid var(--border);border-radius:999px;padding:2px 7px">' + esc(meta.status || 'sem status') + '</span>'
+	        + '<span style="border:1px solid ' + (hasDelivery ? 'rgba(70,238,205,.35)' : 'rgba(245,158,11,.35)') + ';color:' + (hasDelivery ? '#46eecd' : '#f59e0b') + ';border-radius:999px;padding:2px 7px">' + (hasDelivery ? 'Com entrega' : 'Sem entrega no período') + '</span>'
+	        + (meta.adsetStatus ? '<span style="border:1px solid var(--border);border-radius:999px;padding:2px 7px">Conjunto: ' + esc(meta.adsetStatus) + '</span>' : '')
 	        + (meta.creativeName ? '<span style="border:1px solid var(--border);border-radius:999px;padding:2px 7px">Criativo: ' + esc(meta.creativeName) + '</span>' : '')
 	        + '</div></div>'
 	        + '<div style="display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap">'
