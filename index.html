@@ -6851,6 +6851,8 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
 .npc-btn{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:10px;padding:9px 12px;font-family:inherit;font-weight:850;cursor:pointer}
 .npc-btn.primary{border-color:transparent;background:linear-gradient(135deg,#18c08f,#46eecd);color:#061313}
 .npc-btn.ghost{background:transparent;color:var(--text-secondary)}
+.npc-dashboard{border:1px solid var(--border);border-radius:22px;background:var(--card);box-shadow:var(--shadow);padding:18px;display:grid;gap:16px}
+.npc-dashboard-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}.npc-dashboard-title h3{margin:3px 0;color:var(--text);font-size:1.15rem}.npc-dashboard-title p{margin:0;color:var(--text-secondary);line-height:1.4}.npc-dashboard-filter{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.npc-dashboard-filter select{min-width:260px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);padding:10px 12px;font:inherit;font-weight:800}.npc-dashboard-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.npc-dashboard-card{border:1px solid var(--border);border-radius:16px;background:var(--bg);padding:16px}.npc-dashboard-card span{display:block;color:var(--text-muted);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;font-weight:950}.npc-dashboard-card strong{display:block;color:var(--text);font-size:1.7rem;margin-top:8px}.npc-dashboard-card small{color:var(--text-secondary)}.npc-dashboard-lanes{display:grid;grid-template-columns:1.1fr .9fr .9fr;gap:12px}.npc-dashboard-lane{border:1px solid var(--border);border-radius:16px;background:var(--bg);padding:14px;min-height:180px}.npc-dashboard-lane h4{margin:0 0 10px;color:var(--text);display:flex;gap:8px;align-items:center}.npc-dashboard-row{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:11px;margin-top:8px;color:var(--text-secondary);line-height:1.35}.npc-dashboard-row strong{display:block;color:var(--text);margin-bottom:3px}.npc-command-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:10950;opacity:0;pointer-events:none;transition:.2s ease;backdrop-filter:blur(6px)}.npc-command-backdrop.open{opacity:1;pointer-events:auto}.npc-command-modal{position:fixed;inset:34px 36px 34px 36px;z-index:10951;background:var(--bg);border:1px solid rgba(70,238,205,.28);border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.55);overflow:hidden;display:none}.npc-command-modal.open{display:block}.npc-command-modal-scroll{height:100%;overflow:auto;padding:20px}.npc-command-modal-close{position:absolute;right:18px;top:18px;z-index:3;border:1px solid var(--border);background:rgba(255,255,255,.08);color:var(--text);border-radius:14px;width:44px;height:44px;cursor:pointer;font-size:1rem}.npc-command-modal .npc-command{box-shadow:none}.npc-command-modal .npc-command-head{padding-right:74px}
 .npc-command{border:1px solid var(--border);border-radius:22px;overflow:hidden;background:linear-gradient(180deg,rgba(14,21,36,.92),var(--card));box-shadow:var(--shadow)}
 .npc-command-head{padding:22px;display:flex;gap:18px;align-items:center;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(70,238,205,.10),rgba(12,18,31,.84))}
 .npc-command-head .npc-avatar{width:104px;height:104px;border-radius:24px}
@@ -6861,8 +6863,8 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
 .npc-command-tab.active{border-color:rgba(70,238,205,.45);background:rgba(70,238,205,.13);color:#46eecd}
 .npc-command-body{padding:18px;display:grid;gap:16px}.npc-command-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.npc-metric{border:1px solid var(--border);border-radius:16px;background:var(--bg);padding:16px}.npc-metric span{display:block;color:var(--text-muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.16em;font-weight:950}.npc-metric strong{display:block;color:var(--text);font-size:1.7rem;margin-top:8px}.npc-metric small{color:var(--text-secondary)}
 .npc-command-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.72fr);gap:16px}.npc-mini-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.npc-mini-card{border:1px solid var(--border);background:var(--bg);border-radius:16px;padding:14px;color:var(--text-secondary);line-height:1.45}.npc-mini-card strong{display:block;color:var(--text);margin-bottom:8px}.npc-inline-chat{height:360px;border:1px solid var(--border);border-radius:16px;background:var(--bg);padding:14px}.npc-inline-compose{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px}.npc-inline-compose textarea{min-height:54px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);padding:10px;font-family:inherit;resize:vertical}.npc-config-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.npc-config-grid label{display:grid;gap:6px;color:var(--text-secondary);font-size:.78rem;font-weight:850}.npc-config-grid input,.npc-config-grid select,.npc-config-grid textarea{border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);padding:10px;font:inherit}.npc-config-grid textarea{min-height:132px;grid-column:1/-1;resize:vertical}
-@media(max-width:1240px){.npc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.npc-command-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.npc-command-layout{grid-template-columns:1fr}}
-@media(max-width:760px){.npc-grid{grid-template-columns:1fr}.npc-command-head{display:grid}.npc-command-actions{justify-content:flex-start}.npc-command-metrics,.npc-mini-grid,.npc-config-grid{grid-template-columns:1fr}.npc-inline-compose{grid-template-columns:1fr}.npc-workbench{grid-template-columns:1fr}.npc-hero{display:block}}
+@media(max-width:1240px){.npc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.npc-command-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.npc-command-layout{grid-template-columns:1fr}.npc-dashboard-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.npc-dashboard-lanes{grid-template-columns:1fr}}
+@media(max-width:760px){.npc-grid{grid-template-columns:1fr}.npc-command-head{display:grid}.npc-command-actions{justify-content:flex-start}.npc-command-metrics,.npc-mini-grid,.npc-config-grid,.npc-dashboard-grid{grid-template-columns:1fr}.npc-inline-compose{grid-template-columns:1fr}.npc-workbench{grid-template-columns:1fr}.npc-hero{display:block}.npc-command-modal{inset:10px}.npc-command-modal-scroll{padding:10px}.npc-dashboard-filter select{min-width:100%}}
 @media(max-width:1100px){.npc-workbench{grid-template-columns:1fr}.npc-hero{display:block}}
 </style>
 </head>
@@ -7291,16 +7293,17 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
               <button class="npc-btn primary" onclick="npcCreateDraft()"><span class="mso">add</span> Novo NPC</button>
             </div>
           </div>
-          <div class="npc-workbench">
-            <section class="npc-panel">
-              <div id="npcDetail"></div>
-            </section>
-            <aside class="npc-panel">
-              <h3><span class="mso">memory</span> Contexto e memória</h3>
-              <div id="npcMemoryPreview" class="npc-list"></div>
-            </aside>
-          </div>
+          <div id="npcDashboard" class="npc-dashboard"></div>
           <div id="npcCards" class="npc-grid"></div>
+        </div>
+      </div>
+
+
+      <div id="npcCommandBackdrop" class="npc-command-backdrop" onclick="npcCloseCommandModal()"></div>
+      <div id="npcCommandModal" class="npc-command-modal" aria-label="Command Center do NPC">
+        <button class="npc-command-modal-close" onclick="npcCloseCommandModal()"><span class="mso">close</span></button>
+        <div class="npc-command-modal-scroll">
+          <div id="npcCommandModalBody"></div>
         </div>
       </div>
 
@@ -39586,7 +39589,7 @@ const NPC_MENU_MAP = {
   'escritorio':['lord-stanken','lurdinha','maria-onboarding-clientes','joao-relatorios-analise','zezin-monitoramento-proativo','josy-integracoes-ferramentas','sneider-design','ravi-engenharia-plataforma','nina-qa-publicacoes','teo-eficiencia-operacional','gaia-produto-e-evolucao','maya-memoria-e-conhecimento']
 };
 
-var _npcState = { activeNpc:'lurdinha', activeTab:'resumo', context:{ scope:'global', section:'npc-center' } };
+var _npcState = { activeNpc:null, activeTab:'resumo', dashboardFilter:'all', commandModalOpen:false, context:{ scope:'global', section:'npc-center' } };
 
 function npcEsc(v) {
   return typeof esc === 'function' ? esc(v) : String(v == null ? '' : v).replace(/[&<>"']/g, function(ch) {
@@ -39617,13 +39620,12 @@ var _npcSpriteCache = {};
 
 function npcCreateDraft() {
   showToast('Contratação de NPC: a criação completa fica conectada ao Escritório Virtual. Abrindo Lord Stanken para desenhar o novo papel.');
-  npcRenderDetail('lord-stanken');
-  npcSetTab('config');
+  npcOpenCommandModal('lord-stanken', 'config');
 }
 
 function npcInit() {
+  npcRenderDashboard();
   npcRenderCards();
-  npcRenderDetail(_npcState.activeNpc || 'lurdinha');
   npcLoadOfficeRoster();
 }
 
@@ -39742,8 +39744,9 @@ function npcLoadOfficeRoster() {
         profile.reportsToId = row.reportsToId || profile.reportsToId;
       });
       _npcOfficeRosterLoaded = true;
+      npcRenderDashboard();
       npcRenderCards();
-      npcRenderDetail(_npcState.activeNpc || 'lurdinha');
+      if (_npcState.commandModalOpen && _npcState.activeNpc) npcRenderDetail(_npcState.activeNpc);
       npcHydrateAvatars();
     })
     .catch(function(){})
@@ -39856,10 +39859,110 @@ function npcHydrateAvatars() {
   });
 }
 
+
+function npcVisibleProfiles() {
+  if (!_npcState.dashboardFilter || _npcState.dashboardFilter === 'all') return NPC_PROFILES.slice();
+  return NPC_PROFILES.filter(function(n){ return n.id === _npcState.dashboardFilter; });
+}
+
+function npcMemoryCountFor(npcId) {
+  var store = npcMemoryStore();
+  var buckets = store[npcId] || {};
+  return Object.keys(buckets).reduce(function(total, key){ return total + (Array.isArray(buckets[key]) ? buckets[key].length : 0); }, 0);
+}
+
+function npcConversationStatsFor(npcId) {
+  var total = 0;
+  var recent = [];
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var key = localStorage.key(i) || '';
+      if (key.indexOf('starken_npc_chat_v1:' + npcId + ':') !== 0) continue;
+      var rows = JSON.parse(localStorage.getItem(key) || '[]');
+      total += rows.length;
+      rows.slice(-3).forEach(function(row){ recent.push({ npcId:npcId, role:row.role, text:row.text, at:row.at || '', key:key }); });
+    }
+  } catch(e) {}
+  recent.sort(function(a,b){ return String(b.at || '').localeCompare(String(a.at || '')); });
+  return { total: total, recent: recent };
+}
+
+function npcDashboardTotals(rows) {
+  return rows.reduce(function(acc, npc) {
+    var conv = npcConversationStatsFor(npc.id);
+    acc.npcs += 1;
+    acc.conversations += conv.total;
+    acc.memories += npcMemoryCountFor(npc.id);
+    acc.actions += (npc.actions || []).length;
+    acc.tools += (npc.tools || []).length;
+    acc.menus += (npc.menus || []).length;
+    conv.recent.forEach(function(r){ acc.recent.push(r); });
+    (npc.actions || []).slice(0, 2).forEach(function(action){ acc.actionRows.push({ npc:npc, action:action }); });
+    return acc;
+  }, { npcs:0, conversations:0, memories:0, actions:0, tools:0, menus:0, recent:[], actionRows:[] });
+}
+
+function npcDashboardSelectHtml() {
+  return '<select id="npcDashboardFilter" onchange="npcSetDashboardFilter(this.value)"><option value="all">Todos os NPCs</option>' + NPC_PROFILES.map(function(n){ return '<option value="' + npcEsc(n.id) + '" ' + (_npcState.dashboardFilter === n.id ? 'selected' : '') + '>' + npcEsc(n.name) + '</option>'; }).join('') + '</select>';
+}
+
+function npcSetDashboardFilter(value) {
+  _npcState.dashboardFilter = value || 'all';
+  npcRenderDashboard();
+}
+
+function npcDashboardMetric(label, value, hint) {
+  return '<div class="npc-dashboard-card"><span>' + npcEsc(label) + '</span><strong>' + npcEsc(value) + '</strong><small>' + npcEsc(hint || '') + '</small></div>';
+}
+
+function npcRenderDashboard() {
+  var el = document.getElementById('npcDashboard');
+  if (!el) return;
+  var rows = npcVisibleProfiles();
+  var totals = npcDashboardTotals(rows);
+  var selectedNpc = _npcState.dashboardFilter !== 'all' ? npcProfile(_npcState.dashboardFilter) : null;
+  var recent = totals.recent.slice(0, 6);
+  var title = selectedNpc ? 'Dashboard de ' + selectedNpc.name : 'Dashboard geral dos NPCs';
+  var subtitle = selectedNpc ? 'Mostrando conversas, ações, memórias e ferramentas apenas deste NPC.' : 'Visão operacional consolidada de conversas, ações, memórias, ferramentas e menus de todos os NPCs.';
+  var recentHtml = recent.length ? recent.map(function(row){ var npc = npcProfile(row.npcId); return '<div class="npc-dashboard-row"><strong>' + npcEsc(npc.name) + ' · ' + npcEsc(row.role === 'user' ? 'Você' : 'NPC') + '</strong>' + npcEsc(row.text || '').slice(0, 180) + '</div>'; }).join('') : '<div class="npc-empty">Ainda não há conversas registradas para este filtro.</div>';
+  var actionHtml = totals.actionRows.slice(0, 8).map(function(row){ return '<div class="npc-dashboard-row"><strong>' + npcEsc(row.npc.name) + '</strong>' + npcEsc(row.action) + '</div>'; }).join('') || '<div class="npc-empty">Sem ações mapeadas.</div>';
+  var rosterHtml = rows.slice(0, 6).map(function(n){ return '<div class="npc-dashboard-row" onclick="npcOpenCommandModal(\'' + npcEsc(n.id) + '\',\'resumo\')" style="cursor:pointer"><strong>' + npcEsc(n.name) + '</strong>' + npcEsc(n.role) + '</div>'; }).join('');
+  el.innerHTML = '<div class="npc-dashboard-head"><div class="npc-dashboard-title"><div class="npc-kicker">Painel operacional</div><h3>' + npcEsc(title) + '</h3><p>' + npcEsc(subtitle) + '</p></div><div class="npc-dashboard-filter"><span class="npc-pill">Filtro</span>' + npcDashboardSelectHtml() + '</div></div>' +
+    '<div class="npc-dashboard-grid">' +
+      npcDashboardMetric('NPCs no filtro', totals.npcs, 'ativos na central') +
+      npcDashboardMetric('Conversas', totals.conversations, 'mensagens registradas') +
+      npcDashboardMetric('Memórias', totals.memories, 'camadas salvas') +
+      npcDashboardMetric('Ações', totals.actions, 'execuções possíveis') +
+      npcDashboardMetric('Ferramentas', totals.tools, 'capacidades mapeadas') +
+    '</div>' +
+    '<div class="npc-dashboard-lanes"><div class="npc-dashboard-lane"><h4><span class="mso">chat</span> Conversas recentes</h4>' + recentHtml + '</div><div class="npc-dashboard-lane"><h4><span class="mso">bolt</span> Ações disponíveis</h4>' + actionHtml + '</div><div class="npc-dashboard-lane"><h4><span class="mso">smart_toy</span> NPCs no escopo</h4>' + rosterHtml + '</div></div>';
+}
+
 function npcOpenFromCard(npcId) {
-  npcRenderDetail(npcId);
-  var detail = document.getElementById('npcDetail');
-  if (detail && detail.scrollIntoView) detail.scrollIntoView({ behavior:'smooth', block:'start' });
+  npcOpenCommandModal(npcId, 'resumo');
+}
+
+function npcOpenCommandModal(npcId, tab) {
+  _npcState.activeNpc = npcId || _npcState.activeNpc || 'lurdinha';
+  _npcState.activeTab = tab || _npcState.activeTab || 'resumo';
+  _npcState.commandModalOpen = true;
+  var modal = document.getElementById('npcCommandModal');
+  var backdrop = document.getElementById('npcCommandBackdrop');
+  if (modal) modal.classList.add('open');
+  if (backdrop) backdrop.classList.add('open');
+  npcRenderDashboard();
+  npcRenderDetail(_npcState.activeNpc);
+}
+
+function npcCloseCommandModal() {
+  _npcState.commandModalOpen = false;
+  var modal = document.getElementById('npcCommandModal');
+  var backdrop = document.getElementById('npcCommandBackdrop');
+  if (modal) modal.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('open');
+  var body = document.getElementById('npcCommandModalBody');
+  if (body) body.innerHTML = '';
+  npcRenderCards();
 }
 
 function npcRenderCards() {
@@ -39888,7 +39991,7 @@ function npcMemoryPreviewHtml(npc) {
 
 function npcSetTab(tab) {
   _npcState.activeTab = tab || 'resumo';
-  npcRenderDetail(_npcState.activeNpc || 'lurdinha');
+  if (_npcState.commandModalOpen) npcRenderDetail(_npcState.activeNpc || 'lurdinha');
 }
 
 function npcOpenOfficeRoom(npcId) {
@@ -39975,11 +40078,9 @@ function npcRenderDetail(npcId) {
   _npcState.activeNpc = npcId;
   npcRenderCards();
   var npc = npcProfile(npcId);
-  var detail = document.getElementById('npcDetail');
-  var mem = document.getElementById('npcMemoryPreview');
-  if (!detail || !mem) return;
+  var detail = document.getElementById('npcCommandModalBody');
+  if (!detail) return;
   detail.innerHTML = '<section class="npc-command"><div class="npc-command-head">' + npcAvatarHtml(npc, 'detail') + '<div class="npc-command-title"><div class="npc-kicker">NPC Command Center</div><h2>' + npcEsc(npc.name) + '</h2><div class="npc-pill-row"><span class="npc-pill">' + npcEsc(npc.runtime || 'Codex') + '</span><span class="npc-pill">' + npcEsc(npc.model || 'Modelo do canal') + '</span><span class="npc-pill">' + npcEsc(npc.officeNpcId ? 'Vinculado ao Escritório' : 'Vínculo pendente') + '</span></div><p>' + npcEsc(npc.role) + '</p></div><div class="npc-command-actions"><button class="npc-btn primary" onclick="npcSetTab(\'chat\')"><span class="mso">chat</span> Abrir chat</button><button class="npc-btn" onclick="npcSetTab(\'config\')"><span class="mso">edit</span> Editar NPC</button><button class="npc-btn ghost" onclick="npcOpenDrawer(\'' + npcEsc(npc.id) + '\',{scope:\'global\',section:\'escritorio\',title:\'Escritório Virtual\'})"><span class="mso">right_panel_open</span> Drawer</button></div></div><div class="npc-command-tabs">' + npcCommandTabsHtml(npc) + '</div><div class="npc-command-body">' + npcCommandBodyHtml(npc) + '</div></section>';
-  mem.innerHTML = npcMemoryPreviewHtml(npc);
   setTimeout(function(){ npcHydrateAvatars(); npcRenderInlineChat(); }, 0);
 }
 
@@ -40014,8 +40115,7 @@ function npcSendInlineMessage() {
   npcSaveConversation(npc.id, ctx, rows);
   input.value = '';
   npcRenderInlineChat();
-  var mem = document.getElementById('npcMemoryPreview');
-  if (mem) mem.innerHTML = npcMemoryPreviewHtml(npc);
+  npcRenderDashboard();
 }
 
 function npcSaveInlineMemory() {
@@ -40116,7 +40216,8 @@ function npcSendMessage() {
   input.value = '';
   npcRenderDrawerContext();
   npcRenderChat();
-  if (document.getElementById('tab-npc-center') && document.getElementById('tab-npc-center').classList.contains('active')) npcRenderDetail(npc.id);
+  npcRenderDashboard();
+  if (_npcState.commandModalOpen && _npcState.activeNpc === npc.id) npcRenderDetail(npc.id);
 }
 
 function npcSaveInputAsMemory() {
