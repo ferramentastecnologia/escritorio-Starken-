@@ -31483,12 +31483,9 @@ function clientTimelineHomeSnapshot() {
     }));
   });
   var today = new Date();
-  var open = tasks.filter(function(t) { return !(typeof mtIsDoneStatus === 'function' ? mtIsDoneStatus(t.status) : /publicado|complete|completed|cancelado|cancelled/i.test(t.status || '')); });
-  var overdue = open.filter(function(t) {
-    if (!t.due_date) return false;
-    return new Date(t.due_date + 'T23:59:59') < today;
-  });
-  var noOwner = open.filter(function(t) { return !String(t.assignee || '').trim(); });
+  var open = tasks.filter(function(t) { return mtTaskOperationalState(t).open; });
+  var overdue = tasks.filter(function(t) { return mtTaskOperationalState(t).overdue; });
+  var noOwner = tasks.filter(function(t) { return mtTaskOperationalState(t).noOwnerReal; });
   var approvals = open.filter(function(t) { return /aprovacao|aprovação|revisao|revisão/i.test(String(t.status || '')); });
   var scheduled = tasks.filter(function(t) { return clientTimelineHomeTaskStatus(t) === 'scheduled'; });
   var published = tasks.filter(function(t) { return clientTimelineHomeTaskStatus(t) === 'published'; });
@@ -35202,6 +35199,66 @@ function mtIsDoneStatus(status) {
   return ['publicado', 'publicado-st', 'aprovado', 'nao-utilizado', 'nao-publicado', 'cancelado', 'complete'].includes(mtNormalizeStatus(status));
 }
 
+function mtTaskPublishConfig(task) {
+  var cfg = task && task.publish_config;
+  if (!cfg) return {};
+  if (typeof cfg === 'object') return cfg;
+  try { return JSON.parse(cfg); } catch(e) { return {}; }
+}
+
+function mtTaskPostDate(task) {
+  var cfg = mtTaskPublishConfig(task);
+  return cfg.post_date || cfg.publish_date || cfg.scheduled_date || cfg.date || cfg.scheduled_at || cfg.scheduledAt || '';
+}
+
+function mtTaskHasDeliveryDesign(task) {
+  var cfg = mtTaskPublishConfig(task);
+  return !!(task && (task.due_date || cfg.delivery_design || cfg.design_delivery_date || cfg.entrega_design));
+}
+
+function mtTaskHasOperationalDate(task) {
+  return !!(mtTaskHasDeliveryDesign(task) || mtTaskPostDate(task));
+}
+
+function mtTaskHasCreative(task) {
+  if (!task) return false;
+  if (task._creativeUrl || task.thumbnail_url) return true;
+  var cfg = mtTaskPublishConfig(task);
+  if (cfg.thumbnail_url || cfg.media_url || cfg.file_url) return true;
+  var atts = task.attachments || task._cpAttachments || [];
+  return Array.isArray(atts) && atts.some(function(a) {
+    return ['creative', 'final'].includes(String(a.category || '').toLowerCase());
+  });
+}
+
+function mtTaskOperationalState(task) {
+  var status = mtNormalizeStatus(task && task.status);
+  var hasDate = mtTaskHasOperationalDate(task);
+  var hasCreative = mtTaskHasCreative(task);
+  var hasOwner = !!String(task && task.assignee || '').trim();
+  var neutral = ['standby', 'nao-utilizado', 'nao-publicado', 'cancelado'].includes(status);
+  var done = ['publicado', 'publicado-st', 'aprovado', 'agendado', 'complete'].includes(status);
+  var legacyDraft = !done && !neutral && !hasOwner && !hasCreative && !hasDate && ['a-fazer', 'backlog'].includes(status);
+  var measurable = !neutral && !legacyDraft && hasDate;
+  var open = measurable && !done;
+  var overdue = false;
+  if (open && task && task.due_date) {
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    overdue = new Date(task.due_date + 'T00:00:00') < today;
+  }
+  return {
+    status: status,
+    done: done,
+    neutral: neutral,
+    legacyDraft: legacyDraft,
+    noDeadline: !hasDate && !legacyDraft && !neutral,
+    measurable: measurable,
+    open: open,
+    overdue: overdue,
+    noOwnerReal: !hasOwner && !legacyDraft && (hasCreative || hasDate || !['a-fazer', 'backlog'].includes(status))
+  };
+}
+
 function mtStatusBucket(status) {
   var s = mtNormalizeStatus(status);
   if (['publicado', 'publicado-st'].includes(s)) return 'published';
@@ -36040,13 +36097,15 @@ function mtRenderReport(container, sourceTasks, visibleTasks) {
   var shown = visibleTasks || rows;
   var total = rows.length;
   var visibleTotal = shown.length;
-  var done = rows.filter(function(t) { return mtIsDoneStatus(t.status); }).length;
-  var open = total - done;
-  var overdue = rows.filter(function(t) {
-    if (!t.due_date || mtIsDoneStatus(t.status)) return false;
-    var today = new Date(); today.setHours(0,0,0,0);
-    return new Date(t.due_date + 'T00:00:00') < today;
-  }).length;
+  var states = rows.map(mtTaskOperationalState);
+  var measurable = states.filter(function(s) { return s.measurable; }).length;
+  var done = states.filter(function(s) { return s.measurable && s.done; }).length;
+  var open = states.filter(function(s) { return s.open; }).length;
+  var overdue = states.filter(function(s) { return s.overdue; }).length;
+  var neutral = states.filter(function(s) { return s.neutral; }).length;
+  var noDeadline = states.filter(function(s) { return s.noDeadline; }).length;
+  var legacyDraft = states.filter(function(s) { return s.legacyDraft; }).length;
+  var noOwnerReal = states.filter(function(s) { return s.noOwnerReal; }).length;
   var byClient = {};
   rows.forEach(function(t) {
     var name = mtClientName(t);
@@ -36055,6 +36114,7 @@ function mtRenderReport(container, sourceTasks, visibleTasks) {
   var topClient = Object.keys(byClient).sort(function(a, b) { return byClient[b] - byClient[a]; })[0] || 'Sem dados';
   var byPerson = {};
   rows.forEach(function(t) {
+    if (mtTaskOperationalState(t).legacyDraft) return;
     var people = mtSplitAssignees(t.assignee);
     if (!people.length) people = ['Sem responsável'];
     people.forEach(function(p) { byPerson[p] = (byPerson[p] || 0) + 1; });
@@ -36069,9 +36129,14 @@ function mtRenderReport(container, sourceTasks, visibleTasks) {
   html += '<div class="mt-nx-report-grid">';
   [
     ['Total', total, 'tasks na base da visão atual'],
-    ['Abertas', open, 'ainda precisam de ação'],
-    ['Feitas', done, 'publicadas, aprovadas ou fechadas'],
+    ['Mensuráveis', measurable, 'tasks com prazo real de entrega ou postagem'],
+    ['Abertas', open, 'mensuráveis que ainda precisam de ação'],
+    ['Feitas', done, 'publicadas, agendadas, aprovadas ou concluídas'],
     ['Atrasadas', overdue, 'com entrega vencida'],
+    ['Stand-by/neutras', neutral, 'não pesam contra a entrega'],
+    ['Sem prazo', noDeadline, 'fora do percentual principal'],
+    ['Rascunho/legado', legacyDraft, 'sem dono, sem prazo e sem criativo'],
+    ['Sem dono real', noOwnerReal, 'sem responsável, mas com sinal operacional'],
     ['Publicados 7d', published7, 'conteúdos publicados recentemente'],
     ['Agendados 7d', scheduled7, 'conteúdos já agendados'],
     ['Top cliente', byClient[topClient] || 0, topClient],
@@ -36079,7 +36144,7 @@ function mtRenderReport(container, sourceTasks, visibleTasks) {
     ['Agentes abertas', agentOpen, 'tasks digitais pendentes'],
     ['Agentes total', mtAgentTasks.length, 'tasks criadas para agentes'],
     ['Notificações', mtNotifications.length, 'não lidas no escritório'],
-    ['Conclusão', total ? Math.round((done / total) * 100) + '%' : '0%', 'taxa da visão atual'],
+    ['Conclusão', measurable ? Math.round((done / measurable) * 100) + '%' : '0%', 'taxa só das tasks mensuráveis'],
   ].forEach(function(item) {
     html += '<div class="mt-nx-report-cell"><div class="mt-nx-report-k">' + esc(item[0]) + '</div><div class="mt-nx-report-v">' + esc(String(item[1])) + '</div><div class="mt-nx-report-note" title="' + esc(String(item[2])) + '">' + esc(String(item[2])) + '</div></div>';
   });
