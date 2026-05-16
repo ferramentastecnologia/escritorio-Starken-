@@ -12890,8 +12890,9 @@ function renderSidebarContentClients() {
   var lastClient = '';
   try { lastClient = localStorage.getItem('starken_last_client') || ''; } catch(e) {}
   function btn(c) {
-    var cmAttr = ' oncontextmenu="ctShowClientStatusMenu(event,' + JSON.stringify(c.key) + ')"';
-    return '<button class="sidebar-client-btn' + (lastClient === c.key ? ' active' : '') + '" data-client="' + ctlEsc(c.key) + '" onclick="sidebarSelectClient(' + JSON.stringify(c.key) + ')"' + cmAttr + '>' +
+    var clientArg = ctlJsArg(c.key);
+    var cmAttr = ' oncontextmenu="ctShowClientStatusMenu(event,' + clientArg + ')"';
+    return '<button class="sidebar-client-btn' + (lastClient === c.key ? ' active' : '') + '" data-client="' + ctlEsc(c.key) + '" onclick="sidebarSelectClient(' + clientArg + ')"' + cmAttr + '>' +
       clientLogoAvatarHtml({ slug: c.key, name: c.name, logo_url: c.logo_url }, 'sidebar-client-logo') +
       '<span class="sidebar-client-name">' + ctlEsc(c.name) + '</span></button>';
   }
