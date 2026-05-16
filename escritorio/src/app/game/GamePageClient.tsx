@@ -1787,6 +1787,7 @@ function GamePageInner() {
             onEditNpc={(npcId) => EventBus.emit("npc:edit", { npcId })}
             onResetChat={(npcId) => handleResetNpcChatById(npcId)}
             onNpcUpdated={() => refreshChannelNpcs()}
+            embedded
           />
         )}
 
@@ -3037,6 +3038,7 @@ function GamePageInner() {
           onEditNpc={(npcId) => EventBus.emit("npc:edit", { npcId })}
           onResetChat={(npcId) => handleResetNpcChatById(npcId)}
           onNpcUpdated={() => refreshChannelNpcs()}
+          embedded={npcCommandOnly}
         />
       )}
     </div>
