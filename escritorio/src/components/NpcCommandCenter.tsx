@@ -705,7 +705,7 @@ export default function NpcCommandCenter({
           <TabButton icon={<BarChart3 className="h-4 w-4" />} active={tab === "report"} onClick={() => setTab("report")} label="Relatório" />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className={embedded ? "px-6 py-6" : "min-h-0 flex-1 overflow-y-auto px-6 py-6"}>
           {tab === "summary" && (
             <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-4">
