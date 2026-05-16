@@ -6965,6 +6965,7 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
 <style id="npc-center-style">
 .npc-shell{padding:20px;display:grid;gap:18px}
+.npc-shell--cards-only{padding:26px 34px 34px}
 .npc-hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border:1px solid var(--border);border-radius:18px;background:linear-gradient(135deg,rgba(70,238,205,.08),rgba(12,18,31,.86));padding:22px;box-shadow:var(--shadow)}
 .npc-kicker{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.16em;color:var(--accent,#46eecd);margin-bottom:7px}
 .npc-hero h2{margin:0;color:var(--text);font-size:1.55rem;line-height:1.05}
@@ -7448,19 +7449,7 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
 
       <!-- NPC CENTER -->
       <div id="tab-npc-center" class="tab-content">
-        <div class="npc-shell">
-          <div class="npc-hero">
-            <div>
-              <div class="npc-kicker">NPC Command Center</div>
-              <h2>NPCs operacionais</h2>
-              <p>Centralize os agentes do Starken OS: conversa, memória por cliente, memória global, tarefas, relatórios e permissões. Nada aqui substitui os fluxos atuais; esta camada apenas conecta os NPCs ao sistema.</p>
-            </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="npc-btn" onclick="npcOpenDrawer('lurdinha',{scope:'global',section:'npc-center'})"><span class="mso">chat</span> Abrir Lurdinha</button>
-              <button class="npc-btn primary" onclick="npcCreateDraft()"><span class="mso">add</span> Novo NPC</button>
-            </div>
-          </div>
-          <div id="npcDashboard" class="npc-dashboard"></div>
+        <div class="npc-shell npc-shell--cards-only">
           <div id="npcCards" class="npc-grid"></div>
         </div>
       </div>
