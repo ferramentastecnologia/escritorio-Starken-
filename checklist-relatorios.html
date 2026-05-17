@@ -1332,18 +1332,67 @@ body {
   border-radius: var(--radius-sm); cursor: pointer; font-size: 1.1rem; box-shadow: var(--shadow-md);
 }
 
-.content { margin-left: 216px; flex: 1; min-height: 100vh; }
+:root {
+  --main-sidebar-width: 216px;
+  --main-sidebar-collapsed-width: 68px;
+}
+.content {
+  margin-left: var(--main-sidebar-width);
+  flex: 1;
+  min-height: 100vh;
+  transition: margin-left .22s ease, margin-right .22s ease;
+}
+.sidebar-collapse-toggle {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  border: 1px solid rgba(148,163,184,.22);
+  background: rgba(255,255,255,.05);
+  color: rgba(213,221,236,.78);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .16s ease;
+}
+.sidebar-collapse-toggle:hover { border-color: rgba(70,238,205,.45); color: #46eecd; background: rgba(70,238,205,.08); }
+.sidebar-brand { position: relative; }
+body.sidebar-collapsed { --main-sidebar-width: var(--main-sidebar-collapsed-width); }
+body.sidebar-collapsed .sidebar { width: var(--main-sidebar-collapsed-width); }
+body.sidebar-collapsed .content { margin-left: var(--main-sidebar-collapsed-width); }
+body.sidebar-collapsed .sidebar-brand { padding: 10px 8px 8px; display:flex; justify-content:center; }
+body.sidebar-collapsed .sidebar-brand-logo { width: 38px; margin: 0 auto; }
+body.sidebar-collapsed .sidebar-brand span,
+body.sidebar-collapsed .sidebar-brand h1,
+body.sidebar-collapsed .sb-space-tabs,
+body.sidebar-collapsed .nav-category,
+body.sidebar-collapsed .sidebar-menu-trigger-label,
+body.sidebar-collapsed .sidebar-menu-caret,
+body.sidebar-collapsed .sidebar-folder,
+body.sidebar-collapsed .sidebar-content-clients,
+body.sidebar-collapsed .sidebar-footer button span:not(.mso) { display:none !important; }
+body.sidebar-collapsed .sidebar-nav { padding: 8px 7px; }
+body.sidebar-collapsed .sidebar-nav button,
+body.sidebar-collapsed .sidebar-menu-trigger { justify-content:center; padding: 10px 0; gap: 0; border-left: 0; border-radius: 12px; }
+body.sidebar-collapsed .sidebar-nav button .icon,
+body.sidebar-collapsed .sidebar-menu-trigger .icon { width: 42px; height: 32px; }
+body.sidebar-collapsed .sidebar-menu-category:hover > .sidebar-submenu,
+body.sidebar-collapsed .sidebar-menu-category.open > .sidebar-submenu { left: var(--main-sidebar-collapsed-width); }
+body.sidebar-collapsed .sidebar-collapse-toggle { right: -14px; background:#111821; z-index: 2; }
+body.sidebar-collapsed #mainSidebarCollapseIcon { transform: rotate(180deg); }
 
 /* ===== GLOBAL AGENT DOCK ===== */
 :root {
-  --global-agent-dock-expanded: 308px;
+  --global-agent-dock-expanded: 336px;
   --global-agent-dock-collapsed: 58px;
   --global-agent-dock-space: var(--global-agent-dock-expanded);
 }
 body.agent-dock-collapsed { --global-agent-dock-space: var(--global-agent-dock-collapsed); }
 body.agent-dock-visible .content:not(.office-active) {
   margin-right: var(--global-agent-dock-space);
-  transition: margin-right .22s ease;
 }
 .global-agent-dock {
   position: fixed;
@@ -1354,11 +1403,11 @@ body.agent-dock-visible .content:not(.office-active) {
   z-index: 8800;
   display: none;
   flex-direction: column;
-  background: linear-gradient(180deg, rgba(16,24,38,.98), rgba(9,15,26,.98));
+  background: linear-gradient(180deg, rgba(13,18,34,.98), rgba(7,13,24,.99));
   border-left: 1px solid rgba(148,163,184,.18);
-  box-shadow: -18px 0 40px rgba(0,0,0,.22);
+  box-shadow: -18px 0 44px rgba(0,0,0,.28);
   color: var(--text-primary);
-  transition: width .22s ease, transform .22s ease;
+  transition: width .22s ease;
 }
 body.agent-dock-visible .global-agent-dock { display: flex; }
 body.agent-dock-collapsed .global-agent-dock { width: var(--global-agent-dock-collapsed); }
@@ -1366,33 +1415,34 @@ body.agent-dock-collapsed .global-agent-dock { width: var(--global-agent-dock-co
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
-  padding: 18px 18px 14px;
-  border-bottom: 1px solid rgba(148,163,184,.15);
+  gap: 12px;
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid rgba(148,163,184,.16);
 }
 .global-agent-kicker {
   color: var(--starken, #46eecd);
-  font-size: .68rem;
+  font-size: .7rem;
   font-weight: 950;
-  letter-spacing: .22em;
+  letter-spacing: .24em;
   text-transform: uppercase;
 }
 .global-agent-title {
-  margin-top: 3px;
+  margin-top: 5px;
   color: var(--text-primary);
-  font-weight: 850;
-  font-size: 1rem;
+  font-weight: 900;
+  font-size: 1.28rem;
+  line-height: 1.1;
 }
 .global-agent-sub {
   color: var(--text-secondary);
-  font-size: .78rem;
-  margin-top: 2px;
+  font-size: .9rem;
+  margin-top: 6px;
 }
 .global-agent-toggle {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  border: 1px solid rgba(148,163,184,.25);
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,.28);
   background: rgba(255,255,255,.05);
   color: var(--text-primary);
   cursor: pointer;
@@ -1400,73 +1450,100 @@ body.agent-dock-collapsed .global-agent-dock { width: var(--global-agent-dock-co
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  transition: all .16s ease;
 }
-.global-agent-toggle:hover { border-color: rgba(70,238,205,.5); color: var(--starken, #46eecd); }
+.global-agent-toggle:hover { border-color: rgba(70,238,205,.5); color: var(--starken, #46eecd); background: rgba(70,238,205,.08); }
 .global-agent-body {
-  padding: 14px 14px 18px;
+  padding: 18px 18px 22px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  gap: 12px;
+  gap: 14px;
 }
 .global-agent-open-center {
   width: 100%;
   border: 0;
-  border-radius: 14px;
+  border-radius: 18px;
   background: linear-gradient(135deg, #11c88f, #46eecd);
   color: #051018;
-  font-weight: 900;
-  padding: 11px 12px;
+  font-weight: 950;
+  padding: 14px 12px;
   cursor: pointer;
   font-family: inherit;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
+  box-shadow: 0 14px 34px rgba(17,200,143,.16);
 }
-.global-agent-search {
-  width: 100%;
+.global-agent-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   border: 1px solid rgba(148,163,184,.22);
-  border-radius: 999px;
+  border-radius: 16px;
   background: rgba(5,10,20,.55);
+  padding: 0 12px;
+}
+.global-agent-search-wrap .mso { color: rgba(148,163,184,.66); font-size: 19px; }
+.global-agent-search {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
   color: var(--text-primary);
-  padding: 10px 13px;
+  padding: 13px 0;
   font: inherit;
   outline: none;
 }
-.global-agent-search:focus { border-color: rgba(70,238,205,.55); box-shadow: 0 0 0 3px rgba(70,238,205,.08); }
+.global-agent-search-wrap:focus-within { border-color: rgba(70,238,205,.55); box-shadow: 0 0 0 3px rgba(70,238,205,.08); }
 .global-agent-list {
   overflow: auto;
   padding-right: 4px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   min-height: 0;
+}
+.global-agent-list::-webkit-scrollbar { width: 6px; }
+.global-agent-list::-webkit-scrollbar-track { background: transparent; }
+.global-agent-list::-webkit-scrollbar-thumb { background: rgba(70,238,205,.24); border-radius: 999px; }
+.global-agent-card {
+  border: 1px solid transparent;
+  border-radius: 18px;
+  background: transparent;
+  transition: all .16s ease;
+  overflow: hidden;
+}
+.global-agent-card:hover { background: rgba(255,255,255,.035); border-color: rgba(148,163,184,.14); }
+.global-agent-card.expanded {
+  background: rgba(255,255,255,.055);
+  border-color: rgba(148,163,184,.22);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
 }
 .global-agent-row {
   width: 100%;
-  border: 1px solid transparent;
-  border-radius: 15px;
+  border: 0;
   background: transparent;
   color: var(--text-primary);
-  padding: 9px;
+  padding: 10px;
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 30px;
+  grid-template-columns: 52px minmax(0, 1fr) 30px;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-align: left;
   cursor: pointer;
   font-family: inherit;
 }
-.global-agent-row:hover { background: rgba(70,238,205,.08); border-color: rgba(70,238,205,.25); }
-.global-agent-row .npc-avatar { width: 42px; height: 42px; border-radius: 50%; }
+.global-agent-row .npc-avatar { width: 52px; height: 52px; border-radius: 50%; }
 .global-agent-row strong {
   display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: .9rem;
+  font-size: 1rem;
   color: var(--text-primary);
+  line-height: 1.1;
 }
 .global-agent-row span:not(.mso) {
   display: block;
@@ -1474,18 +1551,51 @@ body.agent-dock-collapsed .global-agent-dock { width: var(--global-agent-dock-co
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-secondary);
-  font-size: .74rem;
+  font-size: .82rem;
+  margin-top: 2px;
 }
-.global-agent-chat {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  border: 1px solid rgba(148,163,184,.2);
-  background: rgba(255,255,255,.04);
-  color: var(--text-secondary);
+.global-agent-chevron { color: rgba(203,213,225,.78); transition: transform .16s ease; }
+.global-agent-card.expanded .global-agent-chevron { transform: rotate(180deg); color: var(--starken, #46eecd); }
+.global-agent-expanded { padding: 0 12px 14px; border-top: 1px solid rgba(148,163,184,.10); }
+.global-agent-pill-row { display:flex; gap:7px; flex-wrap:wrap; margin-top: 12px; }
+.global-agent-pill {
+  display:inline-flex; align-items:center; gap:5px;
+  border: 1px solid rgba(70,238,205,.32);
+  background: rgba(70,238,205,.09);
+  color: #46eecd;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: .67rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+.global-agent-stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+.global-agent-stat {
+  border: 1px solid rgba(148,163,184,.16);
+  background: rgba(5,10,20,.32);
+  border-radius: 14px;
+  padding: 10px;
+}
+.global-agent-stat span { display:block; color: rgba(148,163,184,.82); font-size:.72rem; margin-bottom:4px; }
+.global-agent-stat strong { color: var(--text-primary); font-size:.95rem; display:flex; align-items:center; gap:5px; }
+.global-agent-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; }
+.global-agent-action {
+  border: 1px solid rgba(148,163,184,.18);
+  background: rgba(255,255,255,.05);
+  color: var(--text-primary);
+  border-radius: 13px;
+  padding: 9px 6px;
+  font-family: inherit;
+  font-size: .76rem;
+  font-weight: 850;
   cursor: pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
 }
-.global-agent-chat:hover { color: var(--starken, #46eecd); border-color: rgba(70,238,205,.35); }
+.global-agent-action.primary { border-color: rgba(70,238,205,.30); background: rgba(70,238,205,.13); color: #dffff8; }
+.global-agent-action:hover { border-color: rgba(70,238,205,.45); color: #46eecd; }
 .global-agent-collapsed {
   display: none;
   height: 100%;
@@ -7261,6 +7371,7 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
       <img class="sidebar-brand-logo" src="logo-starken-tecnologia.png" alt="Starken Tecnologia">
       <h1>Starken OS</h1>
       <span>Sistema Operacional</span>
+      <button class="sidebar-collapse-toggle" onclick="mainSidebarToggle()" title="Recolher menu principal"><span id="mainSidebarCollapseIcon" class="mso">chevron_left</span></button>
     </div>
     <div class="sb-space-tabs">
       <span class="sb-space-label sb-space-starken">STARKEN</span>
@@ -40789,6 +40900,22 @@ function npcRenderCards() {
 
 
 const GLOBAL_AGENT_DOCK_KEY = 'starken_global_agent_dock_collapsed_v1';
+const GLOBAL_AGENT_DOCK_EXPANDED_KEY = 'starken_global_agent_dock_expanded_npc_v1';
+const MAIN_SIDEBAR_COLLAPSED_KEY = 'starken_main_sidebar_collapsed_v1';
+
+function mainSidebarApplyCollapsed() {
+  var collapsed = false;
+  try { collapsed = localStorage.getItem(MAIN_SIDEBAR_COLLAPSED_KEY) === '1'; } catch(e) {}
+  document.body.classList.toggle('sidebar-collapsed', collapsed);
+  var icon = document.getElementById('mainSidebarCollapseIcon');
+  if (icon) icon.textContent = collapsed ? 'chevron_right' : 'chevron_left';
+}
+
+function mainSidebarToggle() {
+  var next = !document.body.classList.contains('sidebar-collapsed');
+  try { localStorage.setItem(MAIN_SIDEBAR_COLLAPSED_KEY, next ? '1' : '0'); } catch(e) {}
+  mainSidebarApplyCollapsed();
+}
 
 function globalAgentDockIsAvailable() {
   var mainApp = document.getElementById('mainApp');
@@ -40814,11 +40941,32 @@ function globalAgentDockToggle() {
   globalAgentDockRender();
 }
 
+function globalAgentDockSetExpanded(npcId) {
+  var current = '';
+  try { current = localStorage.getItem(GLOBAL_AGENT_DOCK_EXPANDED_KEY) || ''; } catch(e) {}
+  var next = current === npcId ? '' : npcId;
+  try { next ? localStorage.setItem(GLOBAL_AGENT_DOCK_EXPANDED_KEY, next) : localStorage.removeItem(GLOBAL_AGENT_DOCK_EXPANDED_KEY); } catch(e) {}
+  globalAgentDockRender();
+}
+
 function globalAgentDockRefresh() {
+  mainSidebarApplyCollapsed();
   globalAgentDockApplyCollapsed();
   var visible = globalAgentDockIsAvailable();
   document.body.classList.toggle('agent-dock-visible', visible);
   if (visible) globalAgentDockRender();
+}
+
+function globalAgentMemoryCount(npc) {
+  try {
+    var mems = npcGetMemories(npc.id, { scope:'global', section:'npc-center' });
+    return (mems.global || []).length + (mems.scoped || []).length;
+  } catch(e) { return 0; }
+}
+
+function globalAgentDockAction(evt, npcId, tab) {
+  if (evt && evt.stopPropagation) evt.stopPropagation();
+  npcOpenCommandModal(npcId, tab || 'resumo');
 }
 
 function globalAgentDockRender(filterText) {
@@ -40828,6 +40976,8 @@ function globalAgentDockRender(filterText) {
   if (!list && !mini) return;
   var q = (filterText != null ? filterText : ((document.getElementById('globalAgentSearch') || {}).value || '')).toString().trim().toLowerCase();
   var source = (typeof NPC_PROFILES !== 'undefined' ? NPC_PROFILES : []);
+  var expanded = '';
+  try { expanded = localStorage.getItem(GLOBAL_AGENT_DOCK_EXPANDED_KEY) || ''; } catch(e) {}
   var rows = source.filter(function(n) {
     if (!q) return true;
     return [n.name, n.role, (n.domains || []).join(' ')].join(' ').toLowerCase().indexOf(q) >= 0;
@@ -40835,16 +40985,39 @@ function globalAgentDockRender(filterText) {
   if (count) count.textContent = String(source.length);
   if (list) {
     list.innerHTML = rows.map(function(n) {
-      return '<button class="global-agent-row" onclick="npcOpenCommandModal(\'' + npcEsc(n.id) + '\',\'resumo\')">' +
-        npcAvatarHtml(n, 'dock') +
-        '<span><strong>' + npcEsc(n.name) + '</strong><span>' + npcEsc(n.role || '') + '</span></span>' +
-        '<span class="global-agent-chat" onclick="event.stopPropagation();npcOpenCommandModal(\'' + npcEsc(n.id) + '\',\'chat\')" title="Conversar"><span class="mso" style="font-size:18px">chat</span></span>' +
-      '</button>';
+      var isExpanded = expanded === n.id;
+      var memCount = globalAgentMemoryCount(n);
+      var ruleCount = (n.actions || []).length;
+      var model = n.model || 'Padrão do canal';
+      var role = n.role || 'NPC operacional';
+      return '<div class="global-agent-card ' + (isExpanded ? 'expanded' : '') + '">' +
+        '<button class="global-agent-row" onclick="globalAgentDockSetExpanded(&quot;' + npcEsc(n.id) + '&quot;)">' +
+          npcAvatarHtml(n, 'dock') +
+          '<span><strong>' + npcEsc(n.name) + '</strong><span>' + npcEsc(role) + '</span></span>' +
+          '<span class="mso global-agent-chevron">expand_more</span>' +
+        '</button>' +
+        (isExpanded ? '<div class="global-agent-expanded">' +
+          '<div class="global-agent-pill-row">' +
+            '<span class="global-agent-pill">' + npcEsc(n.runtime || 'Codex') + '</span>' +
+            '<span class="global-agent-pill">' + npcEsc(model) + '</span>' +
+            '<span class="global-agent-pill"><span class="mso" style="font-size:14px">auto_awesome</span>Agente</span>' +
+          '</div>' +
+          '<div class="global-agent-stat-grid">' +
+            '<div class="global-agent-stat"><span>Memória</span><strong><span class="mso" style="font-size:16px;color:#c4b5fd">psychology</span>' + npcEsc(memCount + ' itens') + '</strong></div>' +
+            '<div class="global-agent-stat"><span>Regras</span><strong>' + npcEsc(ruleCount + ' ativas') + '</strong></div>' +
+          '</div>' +
+          '<div class="global-agent-actions">' +
+            '<button class="global-agent-action primary" onclick="globalAgentDockAction(event,&quot;' + npcEsc(n.id) + '&quot;,&quot;chat&quot;)"><span class="mso" style="font-size:16px">chat</span>Chat</button>' +
+            '<button class="global-agent-action" onclick="globalAgentDockAction(event,&quot;' + npcEsc(n.id) + '&quot;,&quot;resumo&quot;)"><span class="mso" style="font-size:16px">tune</span>Gerir</button>' +
+            '<button class="global-agent-action" onclick="globalAgentDockAction(event,&quot;' + npcEsc(n.id) + '&quot;,&quot;config&quot;)"><span class="mso" style="font-size:16px">edit</span>Editar</button>' +
+          '</div>' +
+        '</div>' : '') +
+      '</div>';
     }).join('') || '<div class="npc-empty" style="padding:12px">Nenhum NPC encontrado.</div>';
   }
   if (mini) {
     mini.innerHTML = source.slice(0, 7).map(function(n) {
-      return '<button class="global-agent-collapsed-main" onclick="npcOpenCommandModal(\'' + npcEsc(n.id) + '\',\'resumo\')" title="' + npcEsc(n.name) + '">' + npcAvatarHtml(n, 'mini') + '</button>';
+      return '<button class="global-agent-collapsed-main" onclick="npcOpenCommandModal(&quot;' + npcEsc(n.id) + '&quot;,&quot;resumo&quot;)" title="' + npcEsc(n.name) + '">' + npcAvatarHtml(n, 'mini') + '</button>';
     }).join('');
   }
   setTimeout(npcHydrateAvatars, 0);
@@ -41296,7 +41469,10 @@ function npcClearConversation() {
   </div>
   <div class="global-agent-body">
     <button class="global-agent-open-center" onclick="switchTab('npc-center')"><span class="mso">apps</span> Central de NPCs</button>
-    <input id="globalAgentSearch" class="global-agent-search" type="search" placeholder="Buscar agente..." oninput="globalAgentDockRender(this.value)">
+    <label class="global-agent-search-wrap">
+      <span class="mso">search</span>
+      <input id="globalAgentSearch" class="global-agent-search" type="search" placeholder="Buscar agente..." oninput="globalAgentDockRender(this.value)">
+    </label>
     <div id="globalAgentList" class="global-agent-list"></div>
   </div>
   <div class="global-agent-collapsed">
