@@ -21758,6 +21758,46 @@ function metaBiInferCampaignStatus(row) {
   return { raw: raw, group: group };
 }
 
+function metaBiInferAdStatusGroup(row, meta) {
+  row = row || {};
+  meta = meta || {};
+  var raw = row.ad_status || row.effective_status || row.status || meta.status || meta.adsetStatus || '';
+  var group = metaBiCampaignStatusGroup(raw);
+  if (group === 'unknown' && (row.spend > 0 || row.impressions > 0 || row.reach > 0 || row.clicks > 0 || row.landingPageViews > 0 || row.conversions > 0 || row.revenue > 0)) group = 'active';
+  return group;
+}
+
+function metaBiVisibilityAllowsGroup(group, mode) {
+  mode = metaBiNormalizeCampaignVisibility(mode || _metaBiState.campaignVisibility);
+  if (mode === 'all') return true;
+  if (mode === 'paused-only') return group === 'paused';
+  return group === 'active';
+}
+
+function metaBiFilterCreativeItemsByVisibility(items) {
+  var mode = metaBiNormalizeCampaignVisibility(_metaBiState.campaignVisibility);
+  if (mode === 'all') return items || [];
+  return (items || []).filter(function(item) {
+    return metaBiVisibilityAllowsGroup(metaBiInferAdStatusGroup(item, item), mode);
+  });
+}
+
+function metaBiFilterAdRowsByVisibility(adRows, adMeta) {
+  var mode = metaBiNormalizeCampaignVisibility(_metaBiState.campaignVisibility);
+  if (mode === 'all') return adRows || [];
+  return (adRows || []).filter(function(row) {
+    var meta = (adMeta || {})[String(row && row.ad_id || '')] || {};
+    return metaBiVisibilityAllowsGroup(metaBiInferAdStatusGroup(row, meta), mode);
+  });
+}
+
+function metaBiAdMetaAllowedByVisibility(meta) {
+  var mode = metaBiNormalizeCampaignVisibility(_metaBiState.campaignVisibility);
+  if (mode === 'all') return true;
+  return metaBiVisibilityAllowsGroup(metaBiInferAdStatusGroup(meta, meta), mode);
+}
+
+
 function metaBiApplyCampaignVisibility(data) {
   var mode = metaBiNormalizeCampaignVisibility(_metaBiState.campaignVisibility);
   var rows = (data || []).slice();
@@ -22099,7 +22139,8 @@ function metaBiGetInterpretation(row, badge) {
 	      items.push({
 	        url: url,
 	        adName: ad.name || creative.name || 'Anúncio',
-	        status: ad.status || '',
+	        status: ad.effective_status || ad.status || '',
+	        adsetStatus: adset.effective_status || adset.status || '',
 	        type: creative.video_id ? 'video' : 'image'
 	      });
 	    });
@@ -22159,6 +22200,7 @@ function metaBiGetInterpretation(row, badge) {
 
 	function metaBiRenderCampaignHierarchy(campaignRow, adRows, deepPayload) {
 	  var adMeta = metaBiCampaignAdMap(deepPayload || {});
+	  adRows = metaBiFilterAdRowsByVisibility(adRows, adMeta);
 	  var grouped = {};
 	  adRows.forEach(function(row) {
 	    var meta = adMeta[String(row.ad_id || '')] || {};
@@ -22177,6 +22219,7 @@ function metaBiGetInterpretation(row, badge) {
 	    var exists = adRows.some(function(row) { return String(row.ad_id || '') === adId; });
 	    if (exists) return;
 	    var meta = adMeta[adId];
+	    if (!metaBiAdMetaAllowedByVisibility(meta)) return;
 	    var adsetId = meta.adset_id || meta.adset_name || 'sem-conjunto';
 	    if (!grouped[adsetId]) grouped[adsetId] = { id: adsetId, name: meta.adset_name || 'Conjunto sem nome', rows: [] };
 	    grouped[adsetId].rows.push({
@@ -22199,7 +22242,10 @@ function metaBiGetInterpretation(row, badge) {
 
 	  var keys = Object.keys(grouped);
 	  if (!keys.length) {
-	    return '<div style="border:1px dashed var(--border);border-radius:10px;padding:12px;color:var(--text-secondary);font-size:0.78rem;margin-bottom:14px"><span class="mso">account_tree</span> Nenhum conjunto ou anúncio retornou para esta campanha.</div>';
+	    var mode = metaBiNormalizeCampaignVisibility(_metaBiState.campaignVisibility);
+	    var label = mode === 'paused-only' ? 'pausado' : mode === 'active-only' ? 'ativo' : '';
+	    var msg = label ? 'Nenhum anúncio ' + label + ' retornou para esta campanha.' : 'Nenhum conjunto ou anúncio retornou para esta campanha.';
+	    return '<div style="border:1px dashed var(--border);border-radius:10px;padding:12px;color:var(--text-secondary);font-size:0.78rem;margin-bottom:14px"><span class="mso">account_tree</span> ' + msg + '</div>';
 	  }
 
 	  var html = '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:0 0 14px;background:rgba(15,23,42,.22)">'
@@ -22336,7 +22382,7 @@ function metaBiGetInterpretation(row, badge) {
 	    if (!el) continue;
 	    var cacheKey = clientKey + '|' + campaign.id;
 	    if (_metaBiState.creativeCache[cacheKey]) {
-	      el.innerHTML = metaBiCreativeHtml(_metaBiState.creativeCache[cacheKey]);
+	      el.innerHTML = metaBiCreativeHtml(metaBiFilterCreativeItemsByVisibility(_metaBiState.creativeCache[cacheKey]));
 	      continue;
 	    }
 	    try {
@@ -22344,7 +22390,7 @@ function metaBiGetInterpretation(row, badge) {
 	      var items = metaBiCreativeExtractItems(json);
 	      _metaBiState.creativeCache[cacheKey] = items;
 	      if (requestSeq !== _metaBiState.fetchSeq) return;
-	      el.innerHTML = metaBiCreativeHtml(items);
+	      el.innerHTML = metaBiCreativeHtml(metaBiFilterCreativeItemsByVisibility(items));
 	    } catch(e) {
 	      if (requestSeq !== _metaBiState.fetchSeq) return;
 	      el.innerHTML = '<div style="display:flex;align-items:center;gap:6px;color:#f59e0b;font-size:0.72rem;padding:8px 0"><span class="mso">warning</span> Não foi possível buscar criativos desta campanha.</div>';
