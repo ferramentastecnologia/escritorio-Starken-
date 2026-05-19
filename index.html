@@ -11,7 +11,7 @@
 (function() {
   var OFFICE_GAME_PATH = '/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=6&chatDock=20260517&hideNpcDock=1';
   window.STARKEN_OFFICE_GAME_PATH = OFFICE_GAME_PATH;
-  window.STARKEN_OS_BUILD = '20260519-1742-route-history';
+  window.STARKEN_OS_BUILD = '20260519-2038-client-memory';
 
   // Se por qualquer cache/clique antigo o Starken OS for carregado dentro do proprio iframe,
   // troca imediatamente para o escritorio real. Isso evita o efeito "menu dentro de menu".
@@ -4254,6 +4254,114 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
   color: var(--text-primary);
   padding: 12px;
   font: inherit;
+}
+.cp-memory-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) 1fr;
+  gap: 18px;
+}
+.cp-memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cp-memory-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 14px;
+  cursor: pointer;
+  transition: border-color .2s ease, transform .2s ease, background .2s ease;
+}
+.cp-memory-item:hover,
+.cp-memory-item.active {
+  border-color: var(--starken);
+  background: rgba(70, 238, 205, .08);
+  transform: translateY(-1px);
+}
+.cp-memory-item strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+.cp-memory-item p,
+.cp-memory-detail p {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.cp-memory-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+.cp-memory-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(70, 238, 205, .38);
+  border-radius: 999px;
+  color: var(--starken);
+  background: rgba(70, 238, 205, .08);
+  padding: 4px 9px;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.cp-memory-detail {
+  min-height: 420px;
+}
+.cp-memory-note {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 14px;
+  margin-top: 12px;
+}
+.cp-memory-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.cp-memory-field {
+  display: grid;
+  gap: 6px;
+}
+.cp-memory-field label {
+  font-size: .7rem;
+  font-weight: 900;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.cp-memory-field input,
+.cp-memory-field select,
+.cp-memory-field textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 11px 12px;
+  font: inherit;
+}
+.cp-memory-field textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+.cp-memory-field.full {
+  grid-column: 1 / -1;
+}
+@media (max-width: 900px) {
+  .cp-memory-layout,
+  .cp-memory-form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .cp-public-mode .sidebar,
 .cp-public-mode #sidebar,
@@ -9016,6 +9124,7 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
               <button data-cp-tab="ads" onclick="clientPortalSwitchTab('ads')">Meta Ads</button>
               <button data-cp-tab="brand" onclick="clientPortalSwitchTab('brand')">Identidade Visual</button>
               <button data-cp-tab="schedule" onclick="clientPortalSwitchTab('schedule')">Cronograma</button>
+              <button data-cp-tab="memory" onclick="clientPortalSwitchTab('memory')">Memória</button>
               <button data-cp-tab="contents" onclick="clientPortalSwitchTab('contents')">Conteúdos</button>
               <button data-cp-tab="calendar" onclick="clientPortalSwitchTab('calendar')">Calendário</button>
               <button data-cp-tab="tasks" onclick="clientPortalSwitchTab('tasks')">Tarefas</button>
@@ -30177,7 +30286,8 @@ var _cpState = {
   socialSnapshots: [],
   adsSnapshots: [],
   campaignEvents: [],
-  calendarEventMap: {}
+  calendarEventMap: {},
+  memoryItems: []
 };
 
 function cpEsc(v) {
@@ -30439,6 +30549,7 @@ function clientPortalApplyBundle(bundle, slug, replaceClientList) {
   _cpState.socialSnapshots = Array.isArray(bundle.socialSnapshots) ? bundle.socialSnapshots : [];
   _cpState.adsSnapshots = Array.isArray(bundle.adsSnapshots) ? bundle.adsSnapshots : [];
   _cpState.campaignEvents = Array.isArray(bundle.campaignEvents) ? bundle.campaignEvents : [];
+  _cpState.memoryItems = clientPortalLoadMemory(slug);
 }
 
 async function clientPortalLoadData(slug) {
@@ -30511,6 +30622,7 @@ async function clientPortalLoadData(slug) {
   _cpState.socialSnapshots = [];
   _cpState.adsSnapshots = [];
   _cpState.campaignEvents = [];
+  _cpState.memoryItems = clientPortalLoadMemory(slug);
   await clientPortalLoadTaskAttachments(_cpState.tasks);
   _cpState.metrics = clientPortalBuildLocalMetrics();
 }
@@ -30710,6 +30822,7 @@ function clientPortalRender() {
     ads: clientPortalRenderAds,
     brand: clientPortalRenderBrand,
     schedule: clientPortalRenderSchedule,
+    memory: clientPortalRenderMemory,
     contents: clientPortalRenderContents,
     calendar: clientPortalRenderCalendar,
     tasks: clientPortalRenderTasks,
@@ -30935,6 +31048,251 @@ function clientPortalRecentActivity() {
   return rows.slice(0, 7).map(function(r) {
     return '<div class="cp-activity-item"><span class="mso">' + r.icon + '</span><div style="flex:1"><strong style="color:#000">' + cpEsc(r.title) + '</strong><p style="margin:3px 0 0">' + cpEsc(r.text || '') + '</p></div><span class="cp-pill">' + cpEsc(cpDateLabel(r.date)) + '</span></div>';
   }).join('');
+}
+
+function clientPortalMemoryStoreKey() {
+  return 'starken_client_memory_v1';
+}
+
+function clientPortalMemoryReadStore() {
+  try {
+    return JSON.parse(localStorage.getItem(clientPortalMemoryStoreKey()) || '{}') || {};
+  } catch(e) {
+    return {};
+  }
+}
+
+function clientPortalMemoryWriteStore(store) {
+  try {
+    localStorage.setItem(clientPortalMemoryStoreKey(), JSON.stringify(store || {}));
+  } catch(e) {
+    console.warn('Falha ao salvar memória do cliente', e);
+  }
+}
+
+function clientPortalLoadMemory(slug) {
+  var store = clientPortalMemoryReadStore();
+  var rows = Array.isArray(store[slug]) ? store[slug] : [];
+  return rows.sort(function(a, b) {
+    return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+  });
+}
+
+function clientPortalPersistMemory(items) {
+  var slug = _cpState.clientSlug || 'geral';
+  var store = clientPortalMemoryReadStore();
+  store[slug] = Array.isArray(items) ? items : [];
+  clientPortalMemoryWriteStore(store);
+  _cpState.memoryItems = clientPortalLoadMemory(slug);
+}
+
+function clientPortalMemoryTypeMeta(type) {
+  var map = {
+    ata: { label: 'Ata', icon: 'description' },
+    sugestao: { label: 'Sugestão', icon: 'tips_and_updates' },
+    decisao: { label: 'Decisão', icon: 'task_alt' },
+    reclamacao: { label: 'Reclamação', icon: 'report' },
+    insight: { label: 'Insight', icon: 'psychology' }
+  };
+  return map[type] || map.ata;
+}
+
+function clientPortalMemoryStatusLabel(status) {
+  var map = {
+    novo: 'Novo',
+    em_analise: 'Em análise',
+    virou_task: 'Virou ação',
+    resolvido: 'Resolvido'
+  };
+  return map[status] || 'Novo';
+}
+
+function clientPortalMemoryCounts(items) {
+  items = items || [];
+  return {
+    atas: items.filter(function(i) { return i.type === 'ata'; }).length,
+    sugestoes: items.filter(function(i) { return i.type === 'sugestao'; }).length,
+    decisoes: items.filter(function(i) { return i.type === 'decisao'; }).length,
+    acoes: items.filter(function(i) { return i.taskDraft; }).length
+  };
+}
+
+function clientPortalMemoryPreview(text, max) {
+  text = String(text || '').replace(/\s+/g, ' ').trim();
+  max = max || 150;
+  return text.length > max ? text.slice(0, max - 1) + '...' : text;
+}
+
+function clientPortalRenderMemory() {
+  var client = (_cpState.clients || []).find(function(c) { return c.slug === _cpState.clientSlug; }) || {};
+  var title = ((_cpState.hub || {}).client_name || client.name || _cpState.clientSlug || 'Cliente');
+  var items = clientPortalLoadMemory(_cpState.clientSlug);
+  _cpState.memoryItems = items;
+  if (!_cpState.activeMemoryId || !items.some(function(i) { return i.id === _cpState.activeMemoryId; })) {
+    _cpState.activeMemoryId = items[0] ? items[0].id : '';
+  }
+  var active = items.find(function(i) { return i.id === _cpState.activeMemoryId; }) || null;
+  var counts = clientPortalMemoryCounts(items);
+  var listHtml = items.length ? items.map(function(item) {
+    var meta = clientPortalMemoryTypeMeta(item.type);
+    return '<button class="cp-memory-item ' + (active && active.id === item.id ? 'active' : '') + '" onclick="clientPortalSelectMemory(&quot;' + cpEsc(item.id) + '&quot;)">' +
+      '<div class="cp-memory-badges"><span class="cp-memory-type"><span class="mso">' + meta.icon + '</span>' + cpEsc(meta.label) + '</span><span class="cp-pill">' + cpEsc(clientPortalMemoryStatusLabel(item.status)) + '</span></div>' +
+      '<strong>' + cpEsc(item.title || 'Registro sem título') + '</strong>' +
+      '<p style="margin:7px 0 0">' + cpEsc(clientPortalMemoryPreview(item.body, 120)) + '</p>' +
+      '<div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap"><span class="cp-pill"><span class="mso">event</span>' + cpEsc(cpDateLabel(item.meetingDate || item.createdAt)) + '</span>' + (item.taskDraft ? '<span class="cp-pill blue">Ação criada</span>' : '') + '</div>' +
+    '</button>';
+  }).join('') : '<div class="cp-empty" style="padding:26px">Nenhuma ata, sugestão ou decisão registrada para este cliente ainda.</div>';
+
+  return clientPortalHeader('Memória do Cliente', 'Atas de reunião, decisões, sugestões, reclamações e aprendizados conectados ao operacional de ' + title + '.', '<button class="cp-action-btn primary" onclick="clientPortalOpenMemoryModal(&quot;ata&quot;)"><span class="mso">add</span>Nova ata</button><button class="cp-action-btn" onclick="clientPortalOpenMemoryModal(&quot;sugestao&quot;)"><span class="mso">tips_and_updates</span>Nova sugestão</button>') +
+    '<div class="cp-grid">' +
+      clientPortalStatCard('description', counts.atas, 'Atas registradas') +
+      clientPortalStatCard('tips_and_updates', counts.sugestoes, 'Sugestões') +
+      clientPortalStatCard('task_alt', counts.decisoes, 'Decisões') +
+      clientPortalStatCard('playlist_add_check', counts.acoes, 'Ações geradas') +
+      '<div class="cp-card cp-span-12"><div class="cp-memory-layout">' +
+        '<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2>Registros</h2><button class="cp-action-btn" onclick="clientPortalOpenMemoryModal(&quot;insight&quot;)"><span class="mso">add</span>Insight</button></div><div class="cp-memory-list">' + listHtml + '</div></div>' +
+        '<div class="cp-memory-detail">' + clientPortalMemoryDetailHtml(active) + '</div>' +
+      '</div></div>' +
+      '<div class="cp-card cp-span-12"><h2>Como essa memória vira operação</h2><div class="cp-memory-note"><strong>1. Registro</strong><p>Você salva a ata, decisão, reclamação ou sugestão com cliente, data e participantes.</p></div><div class="cp-memory-note"><strong>2. Leitura dos NPCs</strong><p>Lurdinha usa o registro como contexto operacional; Maria transforma briefing em onboarding; Sneider usa referências visuais; João cruza com relatórios.</p></div><div class="cp-memory-note"><strong>3. Ação</strong><p>Quando fizer sentido, o registro vira rascunho de task com dono, próxima etapa e vínculo com o cliente.</p></div></div>' +
+    '</div>';
+}
+
+function clientPortalMemoryDetailHtml(item) {
+  if (!item) {
+    return '<div class="cp-empty" style="padding:40px">Selecione um registro ou crie a primeira ata deste cliente.</div>';
+  }
+  var meta = clientPortalMemoryTypeMeta(item.type);
+  return '<div class="cp-card" style="box-shadow:none;margin:0">' +
+    '<div class="cp-memory-badges"><span class="cp-memory-type"><span class="mso">' + meta.icon + '</span>' + cpEsc(meta.label) + '</span><span class="cp-pill">' + cpEsc(clientPortalMemoryStatusLabel(item.status)) + '</span><span class="cp-pill"><span class="mso">event</span>' + cpEsc(cpFullDateLabel(item.meetingDate || item.createdAt)) + '</span></div>' +
+    '<h2 style="margin-top:16px">' + cpEsc(item.title || 'Registro sem título') + '</h2>' +
+    '<p style="white-space:pre-wrap">' + cpEsc(item.body || '') + '</p>' +
+    (item.participants ? '<div class="cp-memory-note"><strong>Participantes</strong><p>' + cpEsc(item.participants) + '</p></div>' : '') +
+    (item.npcSummary ? '<div class="cp-memory-note"><strong>Análise da Lurdinha</strong><p>' + cpEsc(item.npcSummary) + '</p></div>' : '') +
+    (item.taskDraft ? '<div class="cp-memory-note"><strong>Rascunho de ação</strong><p>' + cpEsc(item.taskDraft) + '</p></div>' : '') +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:18px">' +
+      '<button class="cp-action-btn primary" onclick="clientPortalAnalyzeMemory(&quot;' + cpEsc(item.id) + '&quot;)"><span class="mso">psychology</span>Analisar com Lurdinha</button>' +
+      '<button class="cp-action-btn" onclick="clientPortalCreateTaskDraftFromMemory(&quot;' + cpEsc(item.id) + '&quot;)"><span class="mso">add_task</span>Gerar ação</button>' +
+      '<button class="cp-action-btn" onclick="clientPortalOpenMemoryModal(&quot;' + cpEsc(item.type || 'ata') + '&quot;,&quot;' + cpEsc(item.id) + '&quot;)"><span class="mso">edit</span>Editar</button>' +
+      '<button class="cp-action-btn" onclick="clientPortalDeleteMemory(&quot;' + cpEsc(item.id) + '&quot;)"><span class="mso">delete</span>Remover</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function clientPortalSelectMemory(id) {
+  _cpState.activeMemoryId = id || '';
+  clientPortalRender();
+}
+
+function clientPortalOpenMemoryModal(type, id) {
+  var item = id ? (_cpState.memoryItems || []).find(function(i) { return i.id === id; }) : null;
+  var meta = clientPortalMemoryTypeMeta(type || (item && item.type) || 'ata');
+  var old = document.getElementById('cpMemoryModal');
+  if (old) old.remove();
+  var modal = document.createElement('div');
+  modal.id = 'cpMemoryModal';
+  modal.className = 'cp-modal-frame';
+  modal.innerHTML = '<div class="cp-modal-frame-inner" style="width:min(860px,96vw);height:auto;max-height:92vh">' +
+    '<div class="cp-modal-frame-head"><strong>' + (item ? 'Editar memória' : 'Novo registro') + '</strong><button class="cp-action-btn" onclick="clientPortalCloseMemoryModal()"><span class="mso">close</span></button></div>' +
+    '<div style="padding:18px;overflow:auto">' +
+      '<div class="cp-memory-form-grid">' +
+        '<div class="cp-memory-field"><label>Tipo</label><select id="cpMemoryType"><option value="ata">Ata</option><option value="sugestao">Sugestão</option><option value="decisao">Decisão</option><option value="reclamacao">Reclamação</option><option value="insight">Insight</option></select></div>' +
+        '<div class="cp-memory-field"><label>Data</label><input id="cpMemoryDate" type="date" value="' + cpEsc((item && item.meetingDate) || new Date().toISOString().slice(0, 10)) + '"></div>' +
+        '<div class="cp-memory-field full"><label>Título</label><input id="cpMemoryTitle" value="' + cpEsc(item && item.title || '') + '" placeholder="Ex: Ata reunião mensal, sugestão de campanha, decisão de aprovação..."></div>' +
+        '<div class="cp-memory-field full"><label>Participantes</label><input id="cpMemoryParticipants" value="' + cpEsc(item && item.participants || '') + '" placeholder="Ex: Will, cliente, Lurdinha, Sneider..."></div>' +
+        '<div class="cp-memory-field full"><label>Conteúdo</label><textarea id="cpMemoryBody" placeholder="Cole a ata, resumo, reclamação, sugestão, decisões e próximos passos...">' + cpEsc(item && item.body || '') + '</textarea></div>' +
+        '<div class="cp-memory-field"><label>Status</label><select id="cpMemoryStatus"><option value="novo">Novo</option><option value="em_analise">Em análise</option><option value="virou_task">Virou ação</option><option value="resolvido">Resolvido</option></select></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px"><button class="cp-action-btn" onclick="clientPortalCloseMemoryModal()">Cancelar</button><button class="cp-action-btn primary" onclick="clientPortalSaveMemoryFromModal(&quot;' + cpEsc(id || '') + '&quot;)"><span class="mso">save</span>Salvar memória</button></div>' +
+    '</div></div>';
+  modal.onclick = function(e) { if (e.target === modal) clientPortalCloseMemoryModal(); };
+  document.body.appendChild(modal);
+  var typeInput = document.getElementById('cpMemoryType');
+  var statusInput = document.getElementById('cpMemoryStatus');
+  if (typeInput) typeInput.value = (item && item.type) || type || meta.label.toLowerCase();
+  if (statusInput) statusInput.value = (item && item.status) || 'novo';
+}
+
+function clientPortalCloseMemoryModal() {
+  var modal = document.getElementById('cpMemoryModal');
+  if (modal) modal.remove();
+}
+
+function clientPortalSaveMemoryFromModal(id) {
+  var type = (document.getElementById('cpMemoryType') || {}).value || 'ata';
+  var title = (document.getElementById('cpMemoryTitle') || {}).value || '';
+  var body = (document.getElementById('cpMemoryBody') || {}).value || '';
+  var meetingDate = (document.getElementById('cpMemoryDate') || {}).value || '';
+  var participants = (document.getElementById('cpMemoryParticipants') || {}).value || '';
+  var status = (document.getElementById('cpMemoryStatus') || {}).value || 'novo';
+  if (!title.trim() || !body.trim()) {
+    showToast('Preencha título e conteúdo da memória.');
+    return;
+  }
+  var items = clientPortalLoadMemory(_cpState.clientSlug).slice();
+  var now = new Date().toISOString();
+  var existing = id ? items.find(function(i) { return i.id === id; }) : null;
+  if (existing) {
+    existing.type = type;
+    existing.title = title.trim();
+    existing.body = body.trim();
+    existing.meetingDate = meetingDate;
+    existing.participants = participants.trim();
+    existing.status = status;
+    existing.updatedAt = now;
+  } else {
+    existing = {
+      id: 'mem_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7),
+      clientSlug: _cpState.clientSlug,
+      type: type,
+      title: title.trim(),
+      body: body.trim(),
+      meetingDate: meetingDate,
+      participants: participants.trim(),
+      status: status,
+      createdAt: now,
+      updatedAt: now
+    };
+    items.unshift(existing);
+  }
+  clientPortalPersistMemory(items);
+  _cpState.activeMemoryId = existing.id;
+  clientPortalCloseMemoryModal();
+  clientPortalRender();
+  showToast('Memória do cliente salva.');
+}
+
+function clientPortalAnalyzeMemory(id) {
+  var items = clientPortalLoadMemory(_cpState.clientSlug).slice();
+  var item = items.find(function(i) { return i.id === id; });
+  if (!item) return;
+  var meta = clientPortalMemoryTypeMeta(item.type);
+  item.status = 'em_analise';
+  item.updatedAt = new Date().toISOString();
+  item.npcSummary = meta.label + ' lida como contexto do cliente. Próximo passo recomendado: transformar decisões e pendências em tarefas com dono, prazo e evidência de conclusão.';
+  clientPortalPersistMemory(items);
+  clientPortalRender();
+  showToast('Lurdinha registrou uma análise para essa memória.');
+}
+
+function clientPortalCreateTaskDraftFromMemory(id) {
+  var items = clientPortalLoadMemory(_cpState.clientSlug).slice();
+  var item = items.find(function(i) { return i.id === id; });
+  if (!item) return;
+  item.status = 'virou_task';
+  item.updatedAt = new Date().toISOString();
+  item.taskDraft = 'Criar task a partir de "' + (item.title || 'memória') + '": definir responsável, prazo, evidência esperada e vínculo com ' + (cpClientName(_cpState.clientSlug) || _cpState.clientSlug) + '.';
+  clientPortalPersistMemory(items);
+  clientPortalRender();
+  showToast('Rascunho de ação criado a partir da memória.');
+}
+
+function clientPortalDeleteMemory(id) {
+  if (!window.confirm('Remover este registro de memória do cliente?')) return;
+  var items = clientPortalLoadMemory(_cpState.clientSlug).filter(function(i) { return i.id !== id; });
+  clientPortalPersistMemory(items);
+  _cpState.activeMemoryId = items[0] ? items[0].id : '';
+  clientPortalRender();
+  showToast('Memória removida.');
 }
 
 function clientPortalRenderSocial() {
@@ -31930,7 +32288,6 @@ function ctlJsArg(v) {
 
 function clientTimelineInit() {
   _clientTimelineReady = true;
-  clientTimelineLoadState();
   clientTimelineLoadClients();
   if (!_ctlClientSlug) {
     _ctlClientSlug = _hubCurrentSlug || '';
@@ -31973,7 +32330,6 @@ function clientTimelineSelectClient(slug) {
   _ctlClientSlug = slug || '';
   var sel = document.getElementById('ctlClientSelect');
   if (sel && sel.value !== _ctlClientSlug) sel.value = _ctlClientSlug;
-  clientTimelineSaveState();
   if (!_ctlClientSlug) {
     _ctlTasks = [];
     clientTimelineRenderHome();
@@ -32052,21 +32408,14 @@ function clientTimelineInRange(task) {
   return d >= start && d <= end;
 }
 
-function clientTimelineHasRealPostDate(task) {
-  if (!task) return false;
-  if (typeof mtTaskHasPostDate === 'function' && mtTaskHasPostDate(task)) return true;
-  var entries = typeof mtTaskPublishEntries === 'function' ? mtTaskPublishEntries(task) : [];
-  return entries.some(function(entry) {
-    return !!String(entry.scheduled_for || entry.published_at || entry.post_date || entry.date || '').trim();
-  });
-}
-
 function clientTimelineIsBacklogPlaceholder(task) {
   if (!task) return false;
   var status = typeof mtTaskEffectiveStatus === 'function' ? mtTaskEffectiveStatus(task) : (typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(task.status) : String(task.status || '').toLowerCase());
   if (!['backlog', 'a-fazer'].includes(status)) return false;
   var hasOwner = !!String(task.assignee || '').trim();
-  var hasPostDate = clientTimelineHasRealPostDate(task);
+  var hasPostDate = typeof mtTaskHasPostDate === 'function'
+    ? mtTaskHasPostDate(task)
+    : !!(task.publish_config && task.publish_config.post_date);
   var hasCreative = typeof mtTaskHasCreative === 'function' ? mtTaskHasCreative(task) : false;
   return !hasOwner && !hasPostDate && !hasCreative;
 }
@@ -32109,32 +32458,6 @@ var _ctlHomeLoaded = false;
 var _ctlHomeLoading = false;
 var _ctlHomeWeekKey = null;
 var _ctlHomeCronoFilter = 'all';
-var CTL_TIMELINE_STATE_KEY = 'starken_ctl_timeline_state_v1';
-
-function clientTimelineLoadState() {
-  try {
-    var state = JSON.parse(localStorage.getItem(CTL_TIMELINE_STATE_KEY) || '{}');
-    if (state && typeof state === 'object') {
-      if (state.clientSlug) _ctlClientSlug = state.clientSlug;
-      if (state.weekKey) _ctlHomeWeekKey = state.weekKey;
-      if (state.cronoFilter) _ctlHomeCronoFilter = state.cronoFilter;
-      var rangeEl = document.getElementById('ctlRangeSelect');
-      if (rangeEl && state.range) rangeEl.value = state.range;
-    }
-  } catch(e) {}
-}
-
-function clientTimelineSaveState() {
-  try {
-    var rangeEl = document.getElementById('ctlRangeSelect');
-    localStorage.setItem(CTL_TIMELINE_STATE_KEY, JSON.stringify({
-      weekKey: _ctlHomeWeekKey || '',
-      cronoFilter: _ctlHomeCronoFilter || 'all',
-      clientSlug: _ctlClientSlug || '',
-      range: rangeEl ? rangeEl.value : 'week'
-    }));
-  } catch(e) {}
-}
 
 function clientTimelineIsOperationalClient(input) {
   var c = typeof input === 'object' && input ? input : {};
@@ -32215,7 +32538,6 @@ function clientTimelineHomeNavWeek(delta) {
   var nextIdx = idx + delta;
   if (nextIdx < 0 || nextIdx >= all.length) return;
   _ctlHomeWeekKey = all[nextIdx];
-  clientTimelineSaveState();
   var rangeSel = document.getElementById('ctlRangeSelect');
   if (_ctlClientSlug && rangeSel) rangeSel.value = 'week';
   if (_ctlClientSlug) {
@@ -32229,7 +32551,6 @@ function clientTimelineHomeNavWeek(delta) {
 
 function clientTimelineHomeResetWeek() {
   _ctlHomeWeekKey = null;
-  clientTimelineSaveState();
   var rangeSel = document.getElementById('ctlRangeSelect');
   if (_ctlClientSlug && rangeSel) rangeSel.value = 'week';
   if (_ctlClientSlug) {
@@ -32243,7 +32564,6 @@ function clientTimelineHomeResetWeek() {
 
 function clientTimelineHomeSetCronoFilter(filter) {
   _ctlHomeCronoFilter = filter || 'all';
-  clientTimelineSaveState();
   clientTimelineRenderHome();
 }
 
@@ -32509,7 +32829,6 @@ function clientTimelineRenderHome() {
   var ai = document.getElementById('ctlLurdinhaPanel');
   var notes = document.getElementById('ctlNotes');
   if (!stats || !stages || !next || !ai) return;
-  clientTimelineSaveState();
   var snap = clientTimelineHomeSnapshot();
   var active = snap.active;
   var contentActive = snap.contentActive || [];
@@ -32863,7 +33182,6 @@ function clientTimelineRender() {
   var statsEl = document.getElementById('ctlStats');
   var nextEl = document.getElementById('ctlNextActions');
   if (!stagesEl || !statsEl || !nextEl) return;
-  clientTimelineSaveState();
   if (!_ctlClientSlug) return clientTimelineRenderHome();
 
   var tasks = clientTimelineOperationalTasks(_ctlTasks.filter(clientTimelineInRange));
@@ -33059,7 +33377,6 @@ function clientTimelineOpenContent() {
 function clientTimelineOpenClientContent(slug) {
   if (!slug) return;
   _ctlClientSlug = slug;
-  clientTimelineSaveState();
   sidebarSelectClient(slug);
 }
 
