@@ -31973,6 +31973,7 @@ function clientTimelineSelectClient(slug) {
   _ctlClientSlug = slug || '';
   var sel = document.getElementById('ctlClientSelect');
   if (sel && sel.value !== _ctlClientSlug) sel.value = _ctlClientSlug;
+  clientTimelineSaveState();
   if (!_ctlClientSlug) {
     _ctlTasks = [];
     clientTimelineRenderHome();
@@ -32107,6 +32108,7 @@ function clientTimelineLoadState() {
   try {
     var state = JSON.parse(localStorage.getItem(CTL_TIMELINE_STATE_KEY) || '{}');
     if (state && typeof state === 'object') {
+      if (state.clientSlug) _ctlClientSlug = state.clientSlug;
       if (state.weekKey) _ctlHomeWeekKey = state.weekKey;
       if (state.cronoFilter) _ctlHomeCronoFilter = state.cronoFilter;
       var rangeEl = document.getElementById('ctlRangeSelect');
@@ -32121,6 +32123,7 @@ function clientTimelineSaveState() {
     localStorage.setItem(CTL_TIMELINE_STATE_KEY, JSON.stringify({
       weekKey: _ctlHomeWeekKey || '',
       cronoFilter: _ctlHomeCronoFilter || 'all',
+      clientSlug: _ctlClientSlug || '',
       range: rangeEl ? rangeEl.value : 'week'
     }));
   } catch(e) {}
@@ -33049,6 +33052,7 @@ function clientTimelineOpenContent() {
 function clientTimelineOpenClientContent(slug) {
   if (!slug) return;
   _ctlClientSlug = slug;
+  clientTimelineSaveState();
   sidebarSelectClient(slug);
 }
 
