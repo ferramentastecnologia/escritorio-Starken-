@@ -11,7 +11,7 @@
 (function() {
   var OFFICE_GAME_PATH = '/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=6&chatDock=20260517&hideNpcDock=1';
   window.STARKEN_OFFICE_GAME_PATH = OFFICE_GAME_PATH;
-  window.STARKEN_OS_BUILD = '20260515-2250-crono-week-task-favicon';
+  window.STARKEN_OS_BUILD = '20260519-1742-route-history';
 
   // Se por qualquer cache/clique antigo o Starken OS for carregado dentro do proprio iframe,
   // troca imediatamente para o escritorio real. Isso evita o efeito "menu dentro de menu".
@@ -10670,7 +10670,8 @@ document.addEventListener('DOMContentLoaded', function() {
   try { savedSession = JSON.parse(localStorage.getItem('starkenSession') || 'null'); } catch(e) {}
   var isDesigner = savedSession && savedSession.role === 'designer';
 
-  const lastTab = localStorage.getItem('starken_last_tab');
+  const routeTab = (typeof starkenRouteTabFromLocation === 'function') ? starkenRouteTabFromLocation() : '';
+  const lastTab = routeTab || localStorage.getItem('starken_last_tab');
   if (!isDesigner && lastTab && document.getElementById('tab-' + lastTab)) {
     switchTab(lastTab);
   }
@@ -13135,6 +13136,102 @@ const TAB_TITLES = {
   'pub-history':       'Publicações & Agendamentos'
 };
 
+const STARKEN_OS_BASE_PATH = '/starken-os';
+const STARKEN_TAB_ROUTES = {
+  escritorio: 'escritorio-virtual',
+  'client-portal': 'portal-cliente',
+  gestao: 'gestao',
+  dashboard: 'dashboard',
+  weekly: 'relatorios/semanal',
+  monthly: 'relatorios/mensal',
+  'sched-weekly': 'cronogramas/semanal',
+  'content-approval': 'conteudo/aprovacao',
+  'asana-tasks': 'asana-tasks',
+  clients: 'clientes',
+  history: 'historico',
+  'npc-center': 'npcs',
+  'ai-squads': 'npcs/ai-squads',
+  financeiro: 'financeiro',
+  configuracoes: 'configuracoes',
+  'meta-config': 'trafego-pago/configuracoes-meta',
+  'meta-balance': 'trafego-pago/contas-saldos',
+  'meta-bi': 'trafego-pago/meta-bi',
+  'paid-traffic': 'trafego-pago',
+  'google-ads': 'trafego-pago/google-ads',
+  'meta-publish': 'historico-agendamentos',
+  calendario: 'calendario',
+  'client-central': 'geral/clientes',
+  'client-hub': 'portal-cliente/hub',
+  'client-info': 'portal-cliente/info',
+  'minhas-tasks': 'minhas-tasks',
+  traffic: 'trafego-pago/operacao',
+  'system-logs': 'geral/logs',
+  'pub-history': 'publicacoes',
+  content: 'conteudo'
+};
+const STARKEN_ROUTE_TABS = Object.keys(STARKEN_TAB_ROUTES).reduce(function(acc, tabName) {
+  acc[STARKEN_TAB_ROUTES[tabName]] = tabName;
+  return acc;
+}, {});
+
+function starkenNormalizeRouteSlug(value) {
+  return String(value || '').replace(/^\/+|\/+$/g, '').replace(/\/{2,}/g, '/');
+}
+
+function starkenRouteTabFromLocation() {
+  try {
+    var params = new URLSearchParams(window.location.search || '');
+    var tabParam = params.get('tab');
+    if (tabParam && document.getElementById('tab-' + tabParam)) return tabParam;
+
+    var path = window.location.pathname || '';
+    if (path === STARKEN_OS_BASE_PATH || path === STARKEN_OS_BASE_PATH + '/') return '';
+    if (path.indexOf(STARKEN_OS_BASE_PATH + '/') !== 0) return '';
+
+    var slug = starkenNormalizeRouteSlug(path.slice((STARKEN_OS_BASE_PATH + '/').length));
+    return STARKEN_ROUTE_TABS[slug] || '';
+  } catch(e) {
+    console.warn('[router] failed to read route:', e);
+    return '';
+  }
+}
+
+function starkenUrlForTab(tabName) {
+  var slug = STARKEN_TAB_ROUTES[tabName];
+  return slug ? (STARKEN_OS_BASE_PATH + '/' + slug) : (STARKEN_OS_BASE_PATH + '/');
+}
+
+function starkenUpdateBrowserRoute(tabName, replace) {
+  try {
+    if (window.__starkenRouteApplying) return;
+    if (typeof _cpState !== 'undefined' && _cpState && _cpState.publicMode) return;
+    if (!window.history || !window.history.pushState) return;
+    var currentPath = window.location.pathname || '';
+    if (currentPath && currentPath.indexOf(STARKEN_OS_BASE_PATH) !== 0) return;
+
+    var nextUrl = starkenUrlForTab(tabName);
+    var current = (window.location.pathname || '').replace(/\/+$/, '') || '/';
+    var target = nextUrl.replace(/\/+$/, '') || '/';
+    if (current === target && !window.location.search) return;
+
+    window.history[replace ? 'replaceState' : 'pushState']({ starkenTab: tabName }, '', nextUrl);
+  } catch(e) {
+    console.warn('[router] failed to update route:', e);
+  }
+}
+
+window.addEventListener('popstate', function() {
+  try {
+    var tabName = starkenRouteTabFromLocation() || 'dashboard';
+    if (gpState && gpState.user && gpState.user.role === 'designer') tabName = 'minhas-tasks';
+    if (!document.getElementById('tab-' + tabName)) return;
+    window.__starkenRouteApplying = true;
+    try { switchTab(tabName); } finally { window.__starkenRouteApplying = false; }
+  } catch(e) {
+    console.warn('[router] failed to restore route:', e);
+  }
+});
+
 function switchTab(tabName) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
@@ -13157,6 +13254,7 @@ function switchTab(tabName) {
   document.getElementById('sidebar').classList.remove('open');
   // Persist last active tab
   try { localStorage.setItem('starken_last_tab', tabName); } catch(e) {}
+  if (typeof starkenUpdateBrowserRoute === 'function') starkenUpdateBrowserRoute(tabName);
   // Hide/show client nav bars based on context
   var navBar = document.getElementById('clientNavBar');
   var navBarCal = document.getElementById('clientNavBarCal');
@@ -37038,7 +37136,7 @@ function mtRenderByClient(el, tasks) {
 
   groupEntries.forEach(function(group) {
     const cid = group.key;
-    const clientTasks = groups[cid];
+    const clientTasks = groups[cid] || [];
     const client = mtGetClient(cid);
     const clientName = group.label;
     const color = client ? (client.tenant === 'starken' ? 'var(--brand)' : 'var(--brand-alpha)') : '#6b7280';
@@ -37062,9 +37160,22 @@ function mtRenderByClient(el, tasks) {
         html += '<div class="mt-header-col" data-col="' + i + '">' + h + '<div class="mt-resize-handle" data-col="' + i + '"></div></div>';
       });
       html += '</div>';
-      mtSortTasks(clientTasks).forEach(t => {
-        html += mtRenderRow(t, 'by-client');
-      });
+      if (!clientTasks.length) {
+        html += mtRenderClientEmptyRow(cols, 'Nenhuma task visível neste grupo.');
+      } else {
+        var renderedRows = 0;
+        mtSortTasks(clientTasks).forEach(function(t) {
+          try {
+            html += mtRenderRow(t, 'by-client');
+            renderedRows++;
+          } catch(e) {
+            console.warn('[Minhas Tasks] Falha ao renderizar linha por cliente', t && t.id, e);
+            html += mtRenderRowFallback(t, e, 'by-client');
+            renderedRows++;
+          }
+        });
+        if (!renderedRows) html += mtRenderClientEmptyRow(cols, 'Nenhuma linha renderizada neste grupo.');
+      }
       html += '</div>';
     }
     html += '</div>';
@@ -37228,6 +37339,34 @@ function mtRenderList(el, tasks) {
   html += '</div>';
   el.innerHTML = html;
   _mtInitResize(el, 'by-list');
+}
+
+function mtRenderClientEmptyRow(cols, message) {
+  return '<div class="mt-row by-client" style="grid-template-columns:' + (cols || _mtGetColWidths('by-client')).join(' ') + ';opacity:.75;cursor:default">'
+    + '<div style="grid-column:1/-1;color:rgba(255,255,255,0.45);font-size:12px;padding:0 4px">' + esc(message || 'Nenhuma task visível neste grupo.') + '</div>'
+    + '</div>';
+}
+
+function mtRenderRowFallback(task, error, mode) {
+  task = task || {};
+  mode = mode || 'by-client';
+  var cols = _mtGetColWidths(mode);
+  var status = task.status || 'sem-status';
+  var assignee = task.assignee || 'Sem responsável';
+  var postDate = mtTaskPostDateISO(task) || (task.due_date || '').slice(0, 10) || '';
+  var dateLabel = postDate ? new Date(postDate + 'T00:00:00').toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }) : '—';
+  var taskName = task.name || task.title || 'Task sem nome';
+  var errorText = error && error.message ? error.message : String(error || 'erro desconhecido');
+  return '<div class="mt-row ' + mode + '" style="grid-template-columns:' + cols.join(' ') + ';border-left:3px solid #f59e0b;background:rgba(245,158,11,0.08)" onclick="' + (task.id ? 'ctOpenModal(' + ctlJsArg(task.id) + ')' : '') + '" title="Erro ao montar linha: ' + esc(errorText) + '">'
+    + '<div class="mt-task-name-wrap"><span class="mso" style="color:#f59e0b">warning</span><span class="mt-task-title-stack"><span class="mt-task-title">' + esc(taskName) + '</span><small>Erro ao montar linha, clique para abrir a task</small></span></div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,0.55)">—</div>'
+    + '<div><span class="ct-status" style="background:rgba(245,158,11,0.14);color:#f59e0b">' + esc(status) + '</span></div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,0.65)">' + esc(assignee) + '</div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,0.45)">' + esc(dateLabel) + '</div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,0.45)">' + esc(dateLabel) + '</div>'
+    + '<div style="font-size:12px;color:#f59e0b">render fallback</div>'
+    + '<div style="font-size:12px;color:rgba(255,255,255,0.45)">—</div>'
+    + '</div>';
 }
 
 function mtRenderRow(task, mode) {
