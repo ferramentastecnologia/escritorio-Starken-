@@ -31946,6 +31946,24 @@ function clientTimelineInRange(task) {
   return d >= start && d <= end;
 }
 
+function clientTimelineIsBacklogPlaceholder(task) {
+  if (!task) return false;
+  var status = typeof mtTaskEffectiveStatus === 'function' ? mtTaskEffectiveStatus(task) : (typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(task.status) : String(task.status || '').toLowerCase());
+  if (!['backlog', 'a-fazer'].includes(status)) return false;
+  var hasOwner = !!String(task.assignee || '').trim();
+  var hasPostDate = typeof mtTaskHasPostDate === 'function'
+    ? mtTaskHasPostDate(task)
+    : !!(task.publish_config && task.publish_config.post_date);
+  var hasCreative = typeof mtTaskHasCreative === 'function' ? mtTaskHasCreative(task) : false;
+  return !hasOwner && !hasPostDate && !hasCreative;
+}
+
+function clientTimelineOperationalTasks(tasks) {
+  return (tasks || []).filter(function(task) {
+    return !clientTimelineIsBacklogPlaceholder(task);
+  });
+}
+
 function clientTimelineStageFor(status) {
   var s = status || 'a-fazer';
   return CTL_STAGES.find(function(stage) { return stage.statuses.indexOf(s) >= 0; }) || CTL_STAGES[1];
@@ -32605,7 +32623,7 @@ function clientTimelineRender() {
   if (!stagesEl || !statsEl || !nextEl) return;
   if (!_ctlClientSlug) return clientTimelineRenderHome();
 
-  var tasks = _ctlTasks.filter(clientTimelineInRange);
+  var tasks = clientTimelineOperationalTasks(_ctlTasks.filter(clientTimelineInRange));
   var byStage = {};
   CTL_STAGES.forEach(function(stage) { byStage[stage.key] = []; });
   tasks.forEach(function(task) {
