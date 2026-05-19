@@ -32231,6 +32231,76 @@ function clientTimelineHomeTaskStatus(task) {
   return 'open';
 }
 
+function clientTimelineTasksForClient(tasks, client) {
+  var keys = [client && client.metaKey, client && client.id, client && client.slug].filter(Boolean);
+  return (tasks || []).filter(function(t) {
+    var key = clientTimelineTaskClientKey(t);
+    return keys.indexOf(key) >= 0;
+  });
+}
+
+function clientTimelineCronoForClient(client, weekKey) {
+  var ids = [client && client.id, client && client.metaKey, client && client.slug].filter(Boolean);
+  for (var i = 0; i < ids.length; i++) {
+    if (typeof _dashGetStatus === 'function') {
+      var dashStatus = _dashGetStatus(ids[i], 'sched-weekly', weekKey);
+      if (dashStatus && (dashStatus.status || dashStatus.pdf_url || dashStatus.sent_date)) return dashStatus;
+    }
+    if (typeof getCronogramaStatus === 'function') {
+      var cronoStatus = getCronogramaStatus(ids[i], weekKey);
+      if (cronoStatus) return cronoStatus;
+    }
+  }
+  return { status: 0 };
+}
+
+function clientTimelineClientWeekState(client, weekKey, tasks) {
+  var clientTasks = clientTimelineTasksForClient(tasks, client);
+  var crono = clientTimelineCronoForClient(client, weekKey);
+  var cronoStatus = crono && crono.status ? crono.status : 0;
+  var open = clientTasks.filter(function(t) { return mtTaskOperationalState(t).open; });
+  var approvals = open.filter(function(t) { return /aprovacao|aprovação|revisao|revisão/i.test(String(t.status || '')); });
+  var scheduled = clientTasks.filter(function(t) { return clientTimelineHomeTaskStatus(t) === 'scheduled'; });
+  var published = clientTasks.filter(function(t) { return clientTimelineHomeTaskStatus(t) === 'published'; });
+  var overdue = clientTasks.filter(function(t) { return mtTaskOperationalState(t).overdue; });
+  var noOwner = clientTasks.filter(function(t) { return mtTaskOperationalState(t).noOwnerReal; });
+  var sentAt = crono && (crono.sent_date || crono.sent_at || crono.updated_at);
+  var complements = [];
+  if (cronoStatus === 2 && sentAt) {
+    var sentTime = new Date(sentAt).getTime();
+    if (Number.isFinite(sentTime)) {
+      complements = clientTasks.filter(function(t) {
+        var created = new Date(t.created_at || t.updated_at || 0).getTime();
+        var state = mtTaskOperationalState(t);
+        return Number.isFinite(created) && created > sentTime && !state.done && !state.neutral;
+      });
+    }
+  }
+  var cronoLabel = cronoStatus === 2 ? 'Enviado' : cronoStatus >= 1 ? 'Gerado, falta enviar' : 'Pendente';
+  var nextStep = cronoStatus === 0 ? 'Gerar cronograma' :
+    cronoStatus === 1 ? 'Enviar cronograma' :
+    complements.length ? 'Enviar complemento' :
+    approvals.length ? 'Cobrar aprovação' :
+    overdue.length ? 'Resolver atraso' :
+    open.length ? 'Resolver pendências' :
+    'Semana controlada';
+  return {
+    crono: crono,
+    cronoStatus: cronoStatus,
+    cronoLabel: cronoLabel,
+    cronoTone: cronoStatus === 2 ? 'ok' : cronoStatus >= 1 ? 'warn' : 'bad',
+    tasks: clientTasks,
+    open: open,
+    approvals: approvals,
+    scheduled: scheduled,
+    published: published,
+    overdue: overdue,
+    noOwner: noOwner,
+    complements: complements,
+    nextStep: nextStep
+  };
+}
+
 async function clientTimelineRefreshHome(force) {
   if (_ctlHomeLoading) return;
   if (_ctlHomeLoaded && !force) return;
@@ -32307,8 +32377,9 @@ function clientTimelineHomeSnapshot() {
   });
   var crono = { sent: 0, generated: 0, pending: 0, rows: [] };
   contentActive.forEach(function(c) {
-    var st = (typeof _dashGetStatus === 'function') ? _dashGetStatus(c.id, 'sched-weekly', weekKey) : { status: 0 };
-    var status = st && st.status ? st.status : 0;
+    var weekState = clientTimelineClientWeekState(c, weekKey, tasks);
+    var st = weekState.crono || { status: 0 };
+    var status = weekState.cronoStatus || 0;
     if (status === 2) crono.sent++;
     else if (status >= 1) crono.generated++;
     else crono.pending++;
@@ -32316,7 +32387,8 @@ function clientTimelineHomeSnapshot() {
       cronoStatus: status,
       sent_date: st && st.sent_date,
       pdf_url: st && st.pdf_url,
-      pdf_name: st && st.pdf_name
+      pdf_name: st && st.pdf_name,
+      weekState: weekState
     }));
   });
   var today = new Date();
@@ -32345,11 +32417,13 @@ function clientTimelineHomeSnapshot() {
     if (label && byClient[key].labels.indexOf(label) < 0) byClient[key].labels.push(label);
   }
   crono.rows.forEach(function(c) { if (c.cronoStatus !== 2) addRisk(c.metaKey || c.id, c.cronoStatus >= 1 ? 2 : 4, c.cronoStatus >= 1 ? 'cronograma gerado' : 'cronograma pendente'); });
+  crono.rows.forEach(function(c) { if (c.weekState && c.weekState.complements.length) addRisk(c.metaKey || c.id, 3, 'complemento pendente'); });
   overdue.forEach(function(t) { addRisk(clientTimelineTaskClientKey(t), 5, 'task atrasada'); });
   approvals.forEach(function(t) { addRisk(clientTimelineTaskClientKey(t), 3, 'aguarda aprovação'); });
   noOwner.forEach(function(t) { addRisk(clientTimelineTaskClientKey(t), 2, 'sem responsável'); });
   var critical = Object.keys(byClient).map(function(k) { return byClient[k]; }).sort(function(a,b) { return b.score - a.score || a.name.localeCompare(b.name, 'pt-BR'); });
-  return { active: active, contentActive: contentActive, weekKey: weekKey, weekInfo: weekInfo, range: clientTimelineHomeRange(), crono: crono, tasks: tasks, health: health, open: open, overdue: overdue, noOwner: noOwner, approvals: approvals, scheduled: scheduled, published: published, critical: critical };
+  var complements = crono.rows.reduce(function(sum, r) { return sum + ((r.weekState && r.weekState.complements.length) || 0); }, 0);
+  return { active: active, contentActive: contentActive, weekKey: weekKey, weekInfo: weekInfo, range: clientTimelineHomeRange(), crono: crono, tasks: tasks, health: health, open: open, overdue: overdue, noOwner: noOwner, approvals: approvals, scheduled: scheduled, published: published, complements: complements, critical: critical };
 }
 
 function clientTimelineHomeClientRow(item, kind) {
@@ -32400,6 +32474,7 @@ function clientTimelineRenderHome() {
     ['Cronos pendentes', snap.crono.pending, snap.crono.sent + '/' + contentActive.length + ' enviados'],
     ['Posts da semana', weekPosts, snap.published.length + ' pub · ' + snap.scheduled.length + ' agend'],
     ['Aguardando aprovação', snap.approvals.length, 'revisão/cliente'],
+    ['Complementos', snap.complements || 0, 'ações extras'],
     ['Atrasados', snap.overdue.length, 'precisam ação'],
     ['Sem responsável', snap.noOwner.length, 'atribuir dono'],
   ].map(function(item) {
@@ -32422,13 +32497,16 @@ function clientTimelineRenderHome() {
     return true;
   });
   var cronoRows = cronoList.slice(0, 10).map(function(r) {
-    var label = r.cronoStatus >= 1 ? 'Gerado, falta enviar' : 'Pendente';
-    var cls = r.cronoStatus >= 1 ? 'warn' : 'bad';
+    var state = r.weekState || {};
+    var label = state.cronoLabel || (r.cronoStatus === 2 ? 'Enviado' : r.cronoStatus >= 1 ? 'Gerado, falta enviar' : 'Pendente');
+    var cls = state.cronoTone || (r.cronoStatus === 2 ? 'ok' : r.cronoStatus >= 1 ? 'warn' : 'bad');
     var actions = '';
     if (r.cronoStatus >= 1) {
       if (r.pdf_url) {
         actions += '<a class="ctl-home-chip" href="' + ctlEsc(r.pdf_url) + '" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none">PDF</a>';
-        actions += '<button class="ctl-home-chip warn" onclick="event.stopPropagation();zappfySendReport(' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')">Enviar</button>';
+        if (r.cronoStatus !== 2 || (state.complements && state.complements.length)) {
+          actions += '<button class="ctl-home-chip warn" onclick="event.stopPropagation();zappfySendReport(' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')">Enviar</button>';
+        }
       } else if (r.metaKey) {
         actions += '<button class="ctl-home-chip warn" onclick="event.stopPropagation();cronogramaFromSchedule(' + ctlJsArg(r.metaKey) + ',' + ctlJsArg(r.id) + ',\'sched-weekly\',' + ctlJsArg(snap.weekKey) + ')">Gerar PDF</button>';
       }
@@ -32438,8 +32516,8 @@ function clientTimelineRenderHome() {
     var rowClick = r.metaKey ? 'clientTimelineOpenClientContent(' + ctlJsArg(r.metaKey || r.id) + ')' : 'clientTimelineOpenClientContent(' + ctlJsArg(r.id) + ')';
     return '<div class="ctl-home-row" onclick="' + rowClick + '">' +
       clientLogoAvatarHtml({ slug: r.metaKey || r.id, name: r.name, logo_url: r.logo_url || r.logoUrl || r.logo }, 'ctl-home-logo') +
-      '<div><strong>' + ctlEsc(r.name) + '</strong><small>' + ctlEsc(r.company + ' · ' + label) + '</small></div>' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-left:auto">' + actions + '<span class="ctl-home-chip ' + cls + '">' + label + '</span></div>' +
+      '<div><strong>' + ctlEsc(r.name) + '</strong><small>' + ctlEsc((state.nextStep || label) + ' · ' + ((state.tasks && state.tasks.length) || 0) + ' posts') + '</small></div>' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-left:auto">' + actions + ((state.complements && state.complements.length) ? '<span class="ctl-home-chip warn">+' + state.complements.length + ' complemento</span>' : '') + '<span class="ctl-home-chip ' + cls + '">' + label + '</span></div>' +
     '</div>';
   }).join('') || '<div class="ctl-home-empty"><span class="mso">task_alt</span><br>' + (contentActive.length ? 'Nenhum cronograma neste filtro.' : 'Nenhum cliente com conteúdo nesta semana.') + '</div>';
   var criticalRows = snap.critical.slice(0, 8).map(function(c) { return clientTimelineHomeClientRow(c, 'atenção'); }).filter(Boolean).join('') || '<div class="ctl-home-empty">Nenhum cliente crítico neste momento.</div>';
@@ -32481,6 +32559,9 @@ function clientTimelineRenderHome() {
     var meta = clientTimelineClientMeta(key);
     actions.push({ kind:'task', type:'Aprovação', tone:'warn', action:'Revisar', taskId:t.id, title:t.name || 'Aprovação pendente', text:(meta.name || key || 'Cliente') + ' · ' + mtNormalizeStatus(t.status) + ' · ' + (t.assignee || 'Sem responsável'), key:key, logo:meta });
   });
+  snap.crono.rows.filter(function(r) { return r.weekState && r.weekState.complements.length; }).slice(0, 4).forEach(function(r) {
+    actions.push({ kind:'client', type:'Complemento', tone:'warn', action:'Ver cliente', title:r.name, text:r.weekState.complements.length + ' ação complementar · ' + (snap.weekInfo.label || snap.weekKey), key:r.metaKey || r.id, logo:r });
+  });
   snap.crono.rows.filter(function(r) { return r.cronoStatus >= 1 && r.cronoStatus !== 2; }).slice(0, 4).forEach(function(r) {
     actions.push({ kind:'client', type:'Enviar', tone:'warn', action:'Enviar', title:r.name, text:'Cronograma gerado · ' + (snap.weekInfo.label || snap.weekKey), key:r.metaKey || r.id, logo:r });
   });
@@ -32501,7 +32582,7 @@ function clientTimelineRenderHome() {
       '<div class="ctl-next-action">' + ctlEsc(a.action || 'Abrir') + '</div>' +
     '</div>';
   }).join('') : '<div class="ctl-empty">Nenhuma ação crítica agora.</div>';
-  ai.innerHTML = '<div class="ctl-next-item"><strong>Visão geral · ' + (snap.overdue.length ? 'Atenção' : 'OK') + '</strong><small>' + ctlEsc('Semana: ' + (snap.weekInfo.label || snap.weekKey) + '. Base Starken operacional: ' + active.length + ' clientes; ' + contentActive.length + ' com conteúdo na semana. Há ' + snap.crono.pending + ' cronogramas pendentes, ' + snap.overdue.length + ' tasks atrasadas e ' + snap.approvals.length + ' aprovações abertas.') + '</small></div>' +
+  ai.innerHTML = '<div class="ctl-next-item"><strong>Visão geral · ' + (snap.overdue.length ? 'Atenção' : 'OK') + '</strong><small>' + ctlEsc('Semana: ' + (snap.weekInfo.label || snap.weekKey) + '. Base Starken operacional: ' + active.length + ' clientes; ' + contentActive.length + ' com conteúdo na semana. Há ' + snap.crono.pending + ' cronogramas pendentes, ' + (snap.complements || 0) + ' complementos, ' + snap.overdue.length + ' tasks atrasadas e ' + snap.approvals.length + ' aprovações abertas.') + '</small></div>' +
     '<button class="ctl-btn primary" style="width:100%;margin-top:8px" onclick="clientTimelineHomeAnalyze()">Gerar análise geral</button>' +
     '<button class="ctl-btn" style="width:100%;margin-top:8px" onclick="npcOpenDrawer(\'lurdinha\', {scope:\'global\', section:\'client-timeline\', title:\'Timeline geral da operação\'})"><span class="mso">chat</span> Conversar com Lurdinha</button>';
   if (notes) notes.innerHTML = '<div class="ctl-empty" style="padding:12px">Selecione um cliente para notas rápidas individuais.</div>';
@@ -32515,6 +32596,7 @@ async function clientTimelineHomeAnalyze() {
     '- Clientes com conteúdo na semana: ' + ((snap.contentActive || []).length) + '\n' +
     '- Cronogramas pendentes: ' + snap.crono.pending + '\n' +
     '- Cronogramas enviados: ' + snap.crono.sent + '/' + ((snap.contentActive || []).length) + '\n' +
+    '- Complementos pendentes: ' + (snap.complements || 0) + '\n' +
     '- Posts agendados/publicados da semana: ' + (snap.published.length + snap.scheduled.length) + ' (' + snap.published.length + ' publicados, ' + snap.scheduled.length + ' agendados)\n' +
     '- Tasks atrasadas: ' + snap.overdue.length + '\n' +
     '- Aprovações abertas: ' + snap.approvals.length + '\n' +
