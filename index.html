@@ -32052,14 +32052,21 @@ function clientTimelineInRange(task) {
   return d >= start && d <= end;
 }
 
+function clientTimelineHasRealPostDate(task) {
+  if (!task) return false;
+  if (typeof mtTaskHasPostDate === 'function' && mtTaskHasPostDate(task)) return true;
+  var entries = typeof mtTaskPublishEntries === 'function' ? mtTaskPublishEntries(task) : [];
+  return entries.some(function(entry) {
+    return !!String(entry.scheduled_for || entry.published_at || entry.post_date || entry.date || '').trim();
+  });
+}
+
 function clientTimelineIsBacklogPlaceholder(task) {
   if (!task) return false;
   var status = typeof mtTaskEffectiveStatus === 'function' ? mtTaskEffectiveStatus(task) : (typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(task.status) : String(task.status || '').toLowerCase());
   if (!['backlog', 'a-fazer'].includes(status)) return false;
   var hasOwner = !!String(task.assignee || '').trim();
-  var hasPostDate = typeof mtTaskHasPostDate === 'function'
-    ? mtTaskHasPostDate(task)
-    : !!(task.publish_config && task.publish_config.post_date);
+  var hasPostDate = clientTimelineHasRealPostDate(task);
   var hasCreative = typeof mtTaskHasCreative === 'function' ? mtTaskHasCreative(task) : false;
   return !hasOwner && !hasPostDate && !hasCreative;
 }
