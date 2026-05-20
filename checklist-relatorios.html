@@ -4532,6 +4532,7 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
 }
 .ctl-select,
 .ctl-input {
@@ -4913,6 +4914,8 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
 .ctl-home-weeknav { display:flex; align-items:center; gap:6px; }
 .ctl-home-weeknav .ctl-home-chip { min-height:26px; }
 .ctl-home-week-label { color:var(--text-secondary); font-size:.72rem; font-weight:850; white-space:nowrap; }
+.ctl-master-weeknav { min-height:36px; padding:4px 6px; border:1px solid var(--border); border-radius:8px; background:var(--bg); }
+.ctl-master-weeknav .ctl-home-week-label { min-width:118px; text-align:center; color:var(--text); font-size:.78rem; }
 .ctl-home-filterbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
 .ctl-home-filterbar .ctl-home-chip.active { color:#46eecd; border-color:rgba(70,238,205,.42); background:rgba(70,238,205,.12); box-shadow:0 0 0 1px rgba(70,238,205,.08) inset; }
 .ctl-home-empty { padding: 18px; color: var(--text-muted); text-align:center; border:1px dashed var(--border); border-radius:10px; background:var(--bg); }
@@ -9112,6 +9115,7 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
                 <option value="next-week">Próxima semana</option>
                 <option value="month">Este mês</option>
               </select>
+              <div id="ctlMasterWeekNav" class="ctl-home-weeknav ctl-master-weeknav"></div>
               <button class="ctl-btn" onclick="clientTimelineRefresh()"><span class="mso">sync</span> Atualizar</button>
               <button class="ctl-btn" onclick="clientTimelineLurdinhaAnalyze()"><span class="mso">smart_toy</span> Lurdinha analisar</button>
               <button class="ctl-btn primary" onclick="clientTimelineOpenContent()"><span class="mso">open_in_new</span> Abrir produção</button>
@@ -32245,6 +32249,21 @@ function clientTimelineHomeSetCronoFilter(filter) {
   clientTimelineRenderHome();
 }
 
+function clientTimelineMasterWeekNavHtml() {
+  var weekKey = clientTimelineHomeWeekKey();
+  var weekInfo = clientTimelineHomeWeekInfo(weekKey);
+  var currentKey = (typeof _dashGetCurrentWeekKey === 'function') ? _dashGetCurrentWeekKey() : weekKey;
+  return '<button class="ctl-home-chip" onclick="event.stopPropagation();clientTimelineHomeNavWeek(-1)" title="Semana anterior">‹</button>' +
+    '<span class="ctl-home-week-label">' + ctlEsc((weekInfo && weekInfo.label) || weekKey || 'Semana atual') + '</span>' +
+    '<button class="ctl-home-chip" onclick="event.stopPropagation();clientTimelineHomeNavWeek(1)" title="Próxima semana">›</button>' +
+    (weekKey !== currentKey ? '<button class="ctl-home-chip ok" onclick="event.stopPropagation();clientTimelineHomeResetWeek()">Atual</button>' : '');
+}
+
+function clientTimelineRenderMasterWeekNav() {
+  var el = document.getElementById('ctlMasterWeekNav');
+  if (el) el.innerHTML = clientTimelineMasterWeekNavHtml();
+}
+
 function clientTimelineHomeRange() {
   var weekInfo = clientTimelineHomeWeekInfo();
   if (weekInfo.startISO && weekInfo.endISO) return { startISO: weekInfo.startISO, endISO: weekInfo.endISO };
@@ -32504,6 +32523,7 @@ function clientTimelineHomeTaskRow(task) {
 }
 
 function clientTimelineRenderHome() {
+  clientTimelineRenderMasterWeekNav();
   var stats = document.getElementById('ctlStats');
   var stages = document.getElementById('ctlStages');
   var next = document.getElementById('ctlNextActions');
@@ -32529,7 +32549,6 @@ function clientTimelineRenderHome() {
   var sentPct = contentActive.length ? Math.round((snap.crono.sent / contentActive.length) * 100) : 0;
   var weeklyTotal = snap.health && snap.health.measurable ? snap.health.measurable : snap.tasks.length;
   var weeklyDone = weeklyTotal ? Math.round(((snap.published.length + snap.scheduled.length) / weeklyTotal) * 100) : 0;
-  var weekNav = '<div class="ctl-home-weeknav"><button class="ctl-home-chip" onclick="event.stopPropagation();clientTimelineHomeNavWeek(-1)">‹</button><span class="ctl-home-week-label">' + ctlEsc(snap.weekInfo.label || snap.weekKey) + '</span><button class="ctl-home-chip" onclick="event.stopPropagation();clientTimelineHomeNavWeek(1)">›</button>' + (snap.weekKey !== ((typeof _dashGetCurrentWeekKey === 'function') ? _dashGetCurrentWeekKey() : snap.weekKey) ? '<button class="ctl-home-chip ok" onclick="event.stopPropagation();clientTimelineHomeResetWeek()">Atual</button>' : '') + '</div>';
   var cronoFilters = '<div class="ctl-home-filterbar">' +
     '<button class="ctl-home-chip' + (_ctlHomeCronoFilter === 'all' ? ' active' : '') + '" onclick="event.stopPropagation();clientTimelineHomeSetCronoFilter(&quot;all&quot;)">Todos ' + snap.crono.rows.length + '</button>' +
     '<button class="ctl-home-chip' + (_ctlHomeCronoFilter === 'pending' ? ' active' : '') + '" onclick="event.stopPropagation();clientTimelineHomeSetCronoFilter(&quot;pending&quot;)">Pendentes ' + snap.crono.pending + '</button>' +
@@ -32588,14 +32607,14 @@ function clientTimelineRenderHome() {
     healthTile('Stand-by/neutras', (snap.health && snap.health.neutral) || 0, 'Não pesam contra a entrega', '') +
   '</div>';
   stages.innerHTML = '<div class="ctl-home-grid">' +
-    '<section class="ctl-home-card"><div class="ctl-home-toolbar"><h3 style="margin:0"><span class="mso">monitoring</span> Saúde operacional</h3>' + weekNav + '</div><div class="ctl-home-progress">' +
+    '<section class="ctl-home-card"><div class="ctl-home-toolbar"><h3 style="margin:0"><span class="mso">monitoring</span> Saúde operacional</h3></div><div class="ctl-home-progress">' +
       '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Cronogramas enviados</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + sentPct + '%"></div></div><div class="ctl-home-progress-meta">' + snap.crono.sent + '/' + contentActive.length + '</div></div>' +
       '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Entrega semanal</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + weeklyDone + '%"></div></div><div class="ctl-home-progress-meta">' + (snap.published.length + snap.scheduled.length) + '/' + weeklyTotal + '</div></div>' +
       '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Aprovações abertas</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + Math.min(100, snap.approvals.length * 12) + '%;background:linear-gradient(90deg,#fbbf24,#ef4444)"></div></div><div class="ctl-home-progress-meta">' + snap.approvals.length + '</div></div>' +
     '</div>' + healthGrid + '</section>' +
     '<section class="ctl-home-card"><h3><span class="mso">priority_high</span> Clientes que precisam de atenção</h3><div class="ctl-home-list">' + criticalRows + '</div></section>' +
-    '<section class="ctl-home-card"><div class="ctl-home-toolbar"><h3 style="margin:0"><span class="mso">calendar_month</span> Cronogramas da semana</h3>' + weekNav + '</div>' + cronoFilters + '<div class="ctl-home-list">' + cronoRows + '</div></section>' +
-    '<section class="ctl-home-card"><div class="ctl-home-toolbar"><h3 style="margin:0"><span class="mso">event_available</span> Agendamentos e publicações</h3>' + weekNav + '</div><div class="ctl-home-filterbar"><span class="ctl-home-chip ok">Publicados ' + snap.published.length + '</span><span class="ctl-home-chip warn">Agendados ' + snap.scheduled.length + '</span></div><div class="ctl-home-list">' + postRows + '</div></section>' +
+    '<section class="ctl-home-card"><div class="ctl-home-toolbar"><h3 style="margin:0"><span class="mso">calendar_month</span> Cronogramas da semana</h3></div>' + cronoFilters + '<div class="ctl-home-list">' + cronoRows + '</div></section>' +
+    '<section class="ctl-home-card"><div class="ctl-home-toolbar"><h3 style="margin:0"><span class="mso">event_available</span> Agendamentos e publicações</h3></div><div class="ctl-home-filterbar"><span class="ctl-home-chip ok">Publicados ' + snap.published.length + '</span><span class="ctl-home-chip warn">Agendados ' + snap.scheduled.length + '</span></div><div class="ctl-home-list">' + postRows + '</div></section>' +
   '</div>';
   var actions = [];
   snap.overdue.slice(0, 4).forEach(function(t) {
@@ -32680,6 +32699,7 @@ async function clientTimelineNotifyLurdinhaAnalysis(message, snap) {
 }
 
 function clientTimelineRenderEmpty(message) {
+  clientTimelineRenderMasterWeekNav();
   var stats = document.getElementById('ctlStats');
   var stages = document.getElementById('ctlStages');
   var next = document.getElementById('ctlNextActions');
@@ -32871,6 +32891,7 @@ function clientTimelineNextActionHtml(item) {
 }
 
 function clientTimelineRender() {
+  clientTimelineRenderMasterWeekNav();
   var stagesEl = document.getElementById('ctlStages');
   var statsEl = document.getElementById('ctlStats');
   var nextEl = document.getElementById('ctlNextActions');
@@ -32905,7 +32926,7 @@ function clientTimelineRender() {
     return '<div class="ctl-stat"><small>' + ctlEsc(item[2]) + '</small><strong>' + ctlEsc(item[1]) + '</strong><small>' + ctlEsc(item[0]) + '</small></div>';
   }).join('');
 
-  stagesEl.innerHTML = clientTimelineWeekNavHtml() + clientTimelineClientWeekSummaryHtml(tasks) + '<div class="ctl-board">' + CTL_STAGES.map(function(stage) {
+  stagesEl.innerHTML = clientTimelineClientWeekSummaryHtml(tasks) + '<div class="ctl-board">' + CTL_STAGES.map(function(stage) {
     var rows = byStage[stage.key] || [];
     return '<section class="ctl-stage" data-stage="' + ctlEsc(stage.key) + '">' +
       '<div class="ctl-stage-head"><div class="ctl-stage-title"><span class="mso">' + stage.icon + '</span><div>' + ctlEsc(stage.title) + '<small>' + ctlEsc(stage.sub) + '</small></div></div><span class="ctl-stage-count">' + rows.length + '</span></div>' +
