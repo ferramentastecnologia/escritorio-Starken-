@@ -32402,14 +32402,21 @@ function clientTimelineInRange(task) {
   return d >= start && d <= end;
 }
 
+function clientTimelineHasRealPostDate(task) {
+  if (!task) return false;
+  if (typeof mtTaskHasPostDate === 'function' && mtTaskHasPostDate(task)) return true;
+  var entries = typeof mtTaskPublishEntries === 'function' ? mtTaskPublishEntries(task) : [];
+  return entries.some(function(entry) {
+    return !!String(entry.scheduled_for || entry.published_at || entry.post_date || entry.date || '').trim();
+  });
+}
+
 function clientTimelineIsBacklogPlaceholder(task) {
   if (!task) return false;
   var status = typeof mtTaskEffectiveStatus === 'function' ? mtTaskEffectiveStatus(task) : (typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(task.status) : String(task.status || '').toLowerCase());
   if (!['backlog', 'a-fazer'].includes(status)) return false;
   var hasOwner = !!String(task.assignee || '').trim();
-  var hasPostDate = typeof mtTaskHasPostDate === 'function'
-    ? mtTaskHasPostDate(task)
-    : !!(task.publish_config && task.publish_config.post_date);
+  var hasPostDate = clientTimelineHasRealPostDate(task);
   var hasCreative = typeof mtTaskHasCreative === 'function' ? mtTaskHasCreative(task) : false;
   return !hasOwner && !hasPostDate && !hasCreative;
 }
@@ -32578,14 +32585,17 @@ function clientTimelineTaskClientKey(task) {
 }
 
 function clientTimelineHomeTaskStatus(task) {
+  var effective = typeof mtTaskEffectiveStatus === 'function' ? mtTaskEffectiveStatus(task) : (typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(task && task.status) : String(task && task.status || '').toLowerCase());
+  if (effective === 'publicado') return 'published';
+  if (effective === 'agendado' || effective === 'agendar') return 'scheduled';
   var pc = task.publish_config || {};
   var entries = [];
   if (pc.entries && Array.isArray(pc.entries)) entries = entries.concat(pc.entries);
   ['feed','story','carrossel','reels'].forEach(function(fmt) {
     if (pc[fmt] && Array.isArray(pc[fmt].entries)) entries = entries.concat(pc[fmt].entries);
   });
-  if (entries.some(function(e) { return e.status === 'published'; }) || task.status === 'publicado') return 'published';
-  if (entries.some(function(e) { return e.status === 'scheduled' || e.status === 'queued'; }) || task.status === 'agendado' || task.status === 'agendar') return 'scheduled';
+  if (entries.some(function(e) { var s = typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(e.status) : String(e.status || '').toLowerCase(); return s === 'publicado' || s === 'published' || String(e.published_at || '').trim(); })) return 'published';
+  if (entries.some(function(e) { var s = typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(e.status) : String(e.status || '').toLowerCase(); return s === 'agendado' || s === 'scheduled' || s === 'queued' || String(e.scheduled_for || '').trim(); })) return 'scheduled';
   return 'open';
 }
 

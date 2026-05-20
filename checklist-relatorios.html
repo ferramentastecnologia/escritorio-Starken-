@@ -32160,14 +32160,17 @@ function clientTimelineTaskClientKey(task) {
 }
 
 function clientTimelineHomeTaskStatus(task) {
+  var effective = typeof mtTaskEffectiveStatus === 'function' ? mtTaskEffectiveStatus(task) : (typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(task && task.status) : String(task && task.status || '').toLowerCase());
+  if (effective === 'publicado') return 'published';
+  if (effective === 'agendado' || effective === 'agendar') return 'scheduled';
   var pc = task.publish_config || {};
   var entries = [];
   if (pc.entries && Array.isArray(pc.entries)) entries = entries.concat(pc.entries);
   ['feed','story','carrossel','reels'].forEach(function(fmt) {
     if (pc[fmt] && Array.isArray(pc[fmt].entries)) entries = entries.concat(pc[fmt].entries);
   });
-  if (entries.some(function(e) { return e.status === 'published'; }) || task.status === 'publicado') return 'published';
-  if (entries.some(function(e) { return e.status === 'scheduled' || e.status === 'queued'; }) || task.status === 'agendado' || task.status === 'agendar') return 'scheduled';
+  if (entries.some(function(e) { var s = typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(e.status) : String(e.status || '').toLowerCase(); return s === 'publicado' || s === 'published' || String(e.published_at || '').trim(); })) return 'published';
+  if (entries.some(function(e) { var s = typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(e.status) : String(e.status || '').toLowerCase(); return s === 'agendado' || s === 'scheduled' || s === 'queued' || String(e.scheduled_for || '').trim(); })) return 'scheduled';
   return 'open';
 }
 
