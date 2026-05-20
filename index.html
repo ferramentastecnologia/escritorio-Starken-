@@ -24907,7 +24907,7 @@ function ctRenderList() {
     var safeGroupName = group.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
     // Cálculo de progresso do grupo (excluindo subtasks, apenas tasks raiz)
     var rootTasks = tasks.filter(function(t){ return !t.parent_id; });
-    var doneStatuses = ['publicado','publicado-st','aprovado','cancelado','agendado','nao-utilizado'];
+    var doneStatuses = ['publicado','publicado-st','aprovado','cancelado','nao-utilizado'];
     var doneTasks = rootTasks.filter(function(t){ return doneStatuses.indexOf(t.status) >= 0; }).length;
     var totalRoot = rootTasks.length;
     var pct = totalRoot > 0 ? Math.round((doneTasks / totalRoot) * 100) : 0;
@@ -33155,7 +33155,7 @@ function clientTimelineRenderHome() {
     healthTile('Clientes ativos', active.length, 'Clientes reais da geração de conteúdo', 'ok') +
     healthTile('Com conteúdo', contentActive.length, 'Clientes com tasks na semana escolhida', contentActive.length ? 'ok' : 'warn') +
     healthTile('Cronos enviados', snap.crono.sent + '/' + contentActive.length, 'Cronogramas enviados na semana selecionada', sentPct >= 80 ? 'ok' : 'warn') +
-    healthTile('Entrega semanal', (snap.published.length + snap.scheduled.length) + '/' + weeklyTotal, 'Publicados e agendados contra tasks mensuráveis', weeklyDone >= 80 ? 'ok' : 'warn') +
+    healthTile('Cobertura semanal', (snap.published.length + snap.scheduled.length) + '/' + weeklyTotal, 'Publicados comprovados + agendados contra tasks mensuráveis', weeklyDone >= 80 ? 'ok' : 'warn') +
     healthTile('Atrasos reais', snap.overdue.length, 'Tasks mensuráveis com data vencida', snap.overdue.length ? 'bad' : 'ok') +
     healthTile('Aprovação', snap.approvals.length, 'Tasks aguardando revisão ou cliente', snap.approvals.length ? 'warn' : 'ok') +
     healthTile('Sem prazo', (snap.health && snap.health.noDeadline) || 0, 'Fora do percentual principal', '') +
@@ -33164,7 +33164,7 @@ function clientTimelineRenderHome() {
   stages.innerHTML = '<div class="ctl-home-grid">' +
     '<section class="ctl-home-card"><div class="ctl-home-toolbar"><h3 style="margin:0"><span class="mso">monitoring</span> Saúde operacional</h3></div><div class="ctl-home-progress">' +
       '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Cronogramas enviados</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + sentPct + '%"></div></div><div class="ctl-home-progress-meta">' + snap.crono.sent + '/' + contentActive.length + '</div></div>' +
-      '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Entrega semanal</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + weeklyDone + '%"></div></div><div class="ctl-home-progress-meta">' + (snap.published.length + snap.scheduled.length) + '/' + weeklyTotal + '</div></div>' +
+      '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Cobertura semanal</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + weeklyDone + '%"></div></div><div class="ctl-home-progress-meta">' + (snap.published.length + snap.scheduled.length) + '/' + weeklyTotal + '</div></div>' +
       '<div class="ctl-home-progress-row"><div class="ctl-home-progress-label">Aprovações abertas</div><div class="ctl-home-bar"><div class="ctl-home-fill" style="width:' + Math.min(100, snap.approvals.length * 12) + '%;background:linear-gradient(90deg,#fbbf24,#ef4444)"></div></div><div class="ctl-home-progress-meta">' + snap.approvals.length + '</div></div>' +
     '</div>' + healthGrid + '</section>' +
     '<section class="ctl-home-card"><h3><span class="mso">priority_high</span> Clientes que precisam de atenção</h3><div class="ctl-home-list">' + criticalRows + '</div></section>' +
@@ -37344,10 +37344,12 @@ function mtTaskOperationalState(task) {
   var hasCreative = mtTaskHasCreative(task);
   var hasOwner = mtTaskHasRealOwner(task);
   var neutral = archived || ['standby', 'nao-utilizado', 'nao-publicado', 'cancelado'].includes(status);
-  var done = ['publicado', 'publicado-st', 'aprovado', 'agendado', 'complete'].includes(status);
+  var scheduled = status === 'agendado';
+  var published = ['publicado', 'publicado-st'].includes(status);
+  var done = published || ['aprovado', 'complete'].includes(status);
   var legacyDraft = !done && !neutral && !hasOwner && !hasCreative && !hasDate && ['a-fazer', 'backlog'].includes(status);
   var measurable = !neutral && !legacyDraft && hasDate;
-  var open = measurable && !done;
+  var open = measurable && !done && !scheduled;
   var overdue = false;
   var opDate = mtTaskOperationalDateISO(task);
   if (open && hasPostDate && opDate) {
@@ -37357,6 +37359,8 @@ function mtTaskOperationalState(task) {
   return {
     status: status,
     archived: archived,
+    scheduled: scheduled,
+    published: published,
     done: done,
     neutral: neutral,
     legacyDraft: legacyDraft,
@@ -38270,6 +38274,8 @@ function mtRenderReport(container, sourceTasks, visibleTasks) {
   var states = rows.map(mtTaskOperationalState);
   var measurable = states.filter(function(s) { return s.measurable; }).length;
   var done = states.filter(function(s) { return s.measurable && s.done; }).length;
+  var scheduled = states.filter(function(s) { return s.measurable && s.scheduled; }).length;
+  var published = states.filter(function(s) { return s.measurable && s.published; }).length;
   var open = states.filter(function(s) { return s.open; }).length;
   var overdue = states.filter(function(s) { return s.overdue; }).length;
   var neutral = states.filter(function(s) { return s.neutral; }).length;
@@ -38301,7 +38307,9 @@ function mtRenderReport(container, sourceTasks, visibleTasks) {
     ['Total', total, 'tasks na base da visão atual'],
     ['Mensuráveis', measurable, 'tasks com prazo real de entrega ou postagem'],
     ['Abertas', open, 'mensuráveis que ainda precisam de ação'],
-    ['Feitas', done, 'publicadas, agendadas, aprovadas ou concluídas'],
+    ['Finalizadas', done, 'publicadas, aprovadas ou encerradas'],
+    ['Publicadas', published, 'publicação comprovada ou marcada como publicada'],
+    ['Agendadas', scheduled, 'já estão no calendário, ainda sem prova de publicação'],
     ['Atrasadas', overdue, 'com entrega vencida'],
     ['Stand-by/neutras', neutral, 'não pesam contra a entrega'],
     ['Sem prazo', noDeadline, 'fora do percentual principal'],
@@ -38314,7 +38322,7 @@ function mtRenderReport(container, sourceTasks, visibleTasks) {
     ['Agentes abertas', agentOpen, 'tasks digitais pendentes'],
     ['Agentes total', mtAgentTasks.length, 'tasks criadas para agentes'],
     ['Notificações', mtNotifications.length, 'não lidas no escritório'],
-    ['Conclusão', measurable ? Math.round((done / measurable) * 100) + '%' : '0%', 'taxa só das tasks mensuráveis'],
+    ['Cobertura', measurable ? Math.round(((done + scheduled) / measurable) * 100) + '%' : '0%', 'finalizadas ou agendadas entre as mensuráveis'],
   ].forEach(function(item) {
     html += '<div class="mt-nx-report-cell"><div class="mt-nx-report-k">' + esc(item[0]) + '</div><div class="mt-nx-report-v">' + esc(String(item[1])) + '</div><div class="mt-nx-report-note" title="' + esc(String(item[2])) + '">' + esc(String(item[2])) + '</div></div>';
   });
