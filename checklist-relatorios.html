@@ -2852,6 +2852,17 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
 .ct-modal-close { position:absolute;top:12px;right:16px;background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-secondary);z-index:1; }
 .ct-modal-title { font-size:22px;font-weight:700;letter-spacing:-0.025em;margin-bottom:16px;outline:none;border:none;width:100%;padding:4px 0;border-bottom:2px solid transparent;transition:border-color 0.2s; }
 .ct-modal-title:focus { border-bottom-color:var(--brand); }
+.ct-modal-danger-btn { padding:8px 14px;background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.35);border-radius:8px;font-family:inherit;font-size:.82rem;font-weight:800;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:all .2s; }
+.ct-modal-danger-btn:hover { background:rgba(239,68,68,.22);border-color:rgba(239,68,68,.55);color:#fecaca; }
+.ct-confirm-overlay { position:fixed;inset:0;z-index:12000;background:rgba(0,0,0,.62);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px; }
+.ct-confirm-box { width:min(460px,100%);border:1px solid rgba(239,68,68,.28);border-radius:16px;background:#111827;color:#e5e7eb;box-shadow:0 24px 80px rgba(0,0,0,.45);padding:22px; }
+.ct-confirm-head { display:flex;align-items:center;gap:10px;margin-bottom:10px;color:#fecaca;font-weight:900;font-size:1rem; }
+.ct-confirm-head .mso { color:#f87171; }
+.ct-confirm-box p { margin:0;color:#9ca3af;font-size:.86rem;line-height:1.5; }
+.ct-confirm-actions { display:flex;justify-content:flex-end;gap:10px;margin-top:18px; }
+.ct-confirm-actions button { border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 14px;font-family:inherit;font-weight:850;cursor:pointer; }
+.ct-confirm-cancel { background:rgba(255,255,255,.04);color:#e5e7eb; }
+.ct-confirm-delete { background:#ef4444;color:#fff;border-color:#ef4444!important; }
 .ct-modal-meta { display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border); }
 .ct-modal-meta-item { display:flex;flex-direction:column;gap:4px; }
 .ct-modal-meta-item label { font-size:11px;font-weight:700;text-transform:uppercase;color:var(--on-surface-variant,#444654);letter-spacing:0.8px; }
@@ -8428,6 +8439,7 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
 	            <div id="ctModalClientBadge" class="ct-modal-client-badge" style="display:none"></div>
 	            <div style="display:flex;align-items:center;gap:10px">
               <input type="text" class="ct-modal-title" id="ctModalTitle" placeholder="Nome da tarefa..." style="flex:1" onchange="ctSaveTaskField('name',this.value)">
+              <button id="ctModalDeleteBtn" class="ct-modal-danger-btn" onclick="ctRequestDeleteTask()" title="Excluir task"><span class="mso">delete</span> Excluir</button>
               <button id="ctModalSaveBtn" onclick="ctSaveAllFields()" style="padding:8px 20px;background:#10b981;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:0.85rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s"><span class="mso">save</span> Salvar</button>
               <span id="ctModalSaveStatus" style="font-size:0.75rem;color:#6b7280;min-width:60px;text-align:center"></span>
             </div>
@@ -26016,13 +26028,103 @@ async function ctOpenModal(taskId) {
   }, 10);
 }
 
-function ctCloseModal() {
+function ctCloseModal(skipSave, skipReload) {
   // Auto-save all text fields before closing
-  ctSaveAllFields(true);
+  if (!skipSave) ctSaveAllFields(true);
   const overlay = document.getElementById('ctModalOverlay');
   overlay.classList.remove('open');
   setTimeout(() => { overlay.style.display = 'none'; ctModalTask = null; }, 200);
-  ctLoadGroups(); // Refresh list
+  if (!skipReload) ctLoadGroups(); // Refresh list
+}
+
+function ctConfirmDanger(options) {
+  options = options || {};
+  return new Promise(function(resolve) {
+    var existing = document.getElementById('ctConfirmOverlay');
+    if (existing) existing.remove();
+    var title = options.title || 'Confirmar ação';
+    var message = options.message || 'Esta ação não pode ser desfeita.';
+    var overlay = document.createElement('div');
+    overlay.id = 'ctConfirmOverlay';
+    overlay.className = 'ct-confirm-overlay';
+    overlay.innerHTML =
+      '<div class="ct-confirm-box" onclick="event.stopPropagation()">' +
+        '<div class="ct-confirm-head"><span class="mso">warning</span><span>' + esc(title) + '</span></div>' +
+        '<p>' + esc(message) + '</p>' +
+        '<div class="ct-confirm-actions">' +
+          '<button type="button" class="ct-confirm-cancel" data-confirm="cancel">Cancelar</button>' +
+          '<button type="button" class="ct-confirm-delete" data-confirm="delete"><span class="mso">delete</span> Excluir</button>' +
+        '</div>' +
+      '</div>';
+    function finish(value) {
+      overlay.remove();
+      resolve(value);
+    }
+    overlay.onclick = function(event) {
+      if (event.target === overlay) finish(false);
+    };
+    overlay.querySelector('[data-confirm="cancel"]').onclick = function() { finish(false); };
+    overlay.querySelector('[data-confirm="delete"]').onclick = function() { finish(true); };
+    document.body.appendChild(overlay);
+  });
+}
+
+async function ctRequestDeleteTask() {
+  if (!ctModalTask || !ctModalTask.id) return;
+  var taskName = ctModalTask.name || 'esta task';
+  var ok = await ctConfirmDanger({
+    title: 'Excluir task?',
+    message: 'Você está prestes a excluir "' + taskName + '". Subtasks, comentários, anexos e atividade vinculados também serão removidos.'
+  });
+  if (!ok) return;
+  await ctDeleteModalTask();
+}
+
+function ctRemoveTaskFromRuntimeCaches(taskId) {
+  function strip(list) {
+    if (!Array.isArray(list)) return;
+    for (var i = list.length - 1; i >= 0; i--) {
+      var item = list[i] || {};
+      if (String(item.id) === String(taskId) || String(item.parent_id || '') === String(taskId)) list.splice(i, 1);
+    }
+  }
+  if (typeof mtRemoveTaskFromCaches === 'function') mtRemoveTaskFromCaches(taskId);
+  try { if (typeof _ctlTasks !== 'undefined') strip(_ctlTasks); } catch(e) {}
+  try { if (typeof _ctlHomeTasks !== 'undefined') strip(_ctlHomeTasks); } catch(e) {}
+}
+
+async function ctDeleteModalTask() {
+  if (!ctModalTask || !ctModalTask.id) return;
+  var taskId = ctModalTask.id;
+  var btn = document.getElementById('ctModalDeleteBtn');
+  var statusEl = document.getElementById('ctModalSaveStatus');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="mso">hourglass_empty</span> Excluindo...';
+  }
+  try {
+    await ctApi('delete_task', { id: taskId, user: ctGetUser() });
+    ctRemoveTaskFromRuntimeCaches(taskId);
+    if (typeof showToast === 'function') showToast('Task excluída com segurança.', 'success');
+    ctCloseModal(true, true);
+    if (typeof ctLoadGroups === 'function') await ctLoadGroups();
+    if (typeof mtRender === 'function') mtRender({ preserveScroll: true });
+    if (typeof clientTimelineRefresh === 'function' && typeof _ctlClientSlug !== 'undefined' && _ctlClientSlug) {
+      clientTimelineRefresh();
+    } else if (typeof clientTimelineRefreshHome === 'function') {
+      clientTimelineRefreshHome(true);
+    }
+  } catch(e) {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="mso">delete</span> Excluir';
+    }
+    if (statusEl) {
+      statusEl.innerHTML = '<span class="mso">error</span> Erro ao excluir';
+      setTimeout(function(){ statusEl.textContent = ''; }, 3000);
+    }
+    alert('Erro ao excluir task: ' + (e.message || e));
+  }
 }
 
 async function ctSaveAllFields(silent) {
@@ -37723,6 +37825,16 @@ function mtUpdateTaskInCaches(taskId, patch) {
     (list || []).forEach(function(t) {
       if (String(t.id) === String(taskId)) Object.assign(t, patch);
     });
+  });
+}
+
+function mtRemoveTaskFromCaches(taskId) {
+  [mtTasks, mtAllContentTasks, mtRecentTasks].forEach(function(list) {
+    if (!Array.isArray(list)) return;
+    for (var i = list.length - 1; i >= 0; i--) {
+      var item = list[i] || {};
+      if (String(item.id) === String(taskId) || String(item.parent_id || '') === String(taskId)) list.splice(i, 1);
+    }
   });
 }
 
