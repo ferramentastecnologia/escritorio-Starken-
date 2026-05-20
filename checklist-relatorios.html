@@ -32067,7 +32067,7 @@ function clientTimelineIsBacklogPlaceholder(task) {
   if (!task) return false;
   var status = typeof mtTaskEffectiveStatus === 'function' ? mtTaskEffectiveStatus(task) : (typeof mtNormalizeStatus === 'function' ? mtNormalizeStatus(task.status) : String(task.status || '').toLowerCase());
   if (!['backlog', 'a-fazer'].includes(status)) return false;
-  var hasOwner = !!String(task.assignee || '').trim();
+  var hasOwner = typeof mtTaskHasRealOwner === 'function' ? mtTaskHasRealOwner(task) : !!String(task.assignee || '').trim();
   var hasPostDate = clientTimelineHasRealPostDate(task);
   var hasCreative = typeof mtTaskHasCreative === 'function' ? mtTaskHasCreative(task) : false;
   return !hasOwner && !hasPostDate && !hasCreative;
@@ -36687,6 +36687,12 @@ function mtTaskHasCreative(task) {
   });
 }
 
+function mtTaskHasRealOwner(task) {
+  var assignee = String(task && task.assignee || '').trim();
+  if (!assignee) return false;
+  return !/(^|\\b)(sem\\s+respons[aá]vel|sem\\s+dono|unassigned|no\\s+owner)(\\b|$)/i.test(assignee);
+}
+
 function mtTaskCreativeInfo(task) {
   if (!task) return null;
   var url = task._creativeUrl || task.thumbnail_url || '';
@@ -36723,7 +36729,7 @@ function mtTaskOperationalState(task) {
   var hasDate = mtTaskHasOperationalDate(task);
   var hasPostDate = mtTaskHasPostDate(task);
   var hasCreative = mtTaskHasCreative(task);
-  var hasOwner = !!String(task && task.assignee || '').trim();
+  var hasOwner = mtTaskHasRealOwner(task);
   var neutral = ['standby', 'nao-utilizado', 'nao-publicado', 'cancelado'].includes(status);
   var done = ['publicado', 'publicado-st', 'aprovado', 'agendado', 'complete'].includes(status);
   var legacyDraft = !done && !neutral && !hasOwner && !hasCreative && !hasDate && ['a-fazer', 'backlog'].includes(status);
