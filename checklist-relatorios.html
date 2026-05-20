@@ -1583,11 +1583,9 @@ body.agent-dock-collapsed .global-agent-dock { width: var(--global-agent-dock-co
 body.agent-dock-collapsed .global-agent-frame,
 body.agent-dock-collapsed .global-agent-host-toggle-expanded { display: none; }
 body.agent-dock-collapsed .global-agent-collapse-rail { display: flex; }
-body.agent-dock-visible #designerOverviewBtn { right: calc(var(--global-agent-dock-space) + 24px) !important; }
 @media (max-width: 1180px) {
   body.agent-dock-visible .content { margin-right: 0; }
   .global-agent-dock { display: none !important; }
-  body.agent-dock-visible #designerOverviewBtn { right: 24px !important; }
 }
 
 .topbar {
@@ -10745,17 +10743,6 @@ document.addEventListener('DOMContentLoaded', function() {
   setTimeout(_tryRestoreClient, 300);
 
   restoreSidebarFolders();
-
-  // ─── DESIGNER OVERVIEW BTN: show for non-designers after DOM ready ───
-  setTimeout(function() {
-    try {
-      var _sess = JSON.parse(localStorage.getItem('starkenSession') || 'null');
-      if (_sess && _sess.role !== 'designer') {
-        var _btn = document.getElementById('designerOverviewBtn');
-        if (_btn) _btn.style.display = 'block';
-      }
-    } catch(e) {}
-  }, 800);
 
   // ─── PUBLISH QUEUE PROCESSOR + ALERTAS (polling every 2 min) ───
   let _queueInterval = null;
@@ -40379,21 +40366,7 @@ var _doState = {
 var DESIGNER_NAMES = ['Victor'];
 
 function showDesignerOverviewBtn() {
-  if (!gpState.user || gpState.user.role === 'designer') return;
-  var btn = document.getElementById('designerOverviewBtn');
-  if (btn) {
-    btn.style.display = 'block';
-  } else {
-    // DOM not ready yet (IIFE restore runs before end of HTML) — retry after parse
-    document.addEventListener('DOMContentLoaded', function() {
-      var b = document.getElementById('designerOverviewBtn');
-      if (b && gpState.user && gpState.user.role !== 'designer') b.style.display = 'block';
-    });
-    setTimeout(function() {
-      var b = document.getElementById('designerOverviewBtn');
-      if (b && gpState.user && gpState.user.role !== 'designer') b.style.display = 'block';
-    }, 500);
-  }
+  return;
 }
 
 async function openDesignerOverview() {
@@ -42301,12 +42274,6 @@ function npcClearConversation() {
   </div>
 </aside>
 
-<div id="designerOverviewBtn" style="display:none;position:fixed;bottom:24px;right:24px;z-index:9000">
-  <button onclick="openDesignerOverview()" style="background:#1e3a5f;color:#fff;border:none;border-radius:12px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(30,58,95,0.35);display:flex;align-items:center;gap:8px;transition:background 0.15s" onmouseover="this.style.background='#2a4dd7'" onmouseout="this.style.background='#1e3a5f'">
-    <span class="mso">palette</span> Tasks Designers
-  </button>
-</div>
-
 <!-- ═══ DESIGNER OVERVIEW MODAL ═══ -->
 <div id="designerOverviewModal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.55);align-items:center;justify-content:center" onclick="if(event.target===this)closeDesignerOverview()">
   <div style="background:#fff;border-radius:16px;width:92%;max-width:1100px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
@@ -42350,7 +42317,7 @@ function npcClearConversation() {
           </tr>
         </thead>
         <tbody id="doTaskBody">
-          <tr><td colspan="6" style="text-align:center;padding:40px;color:#6b7280">Clique em "Tasks Designers" para carregar</td></tr>
+          <tr><td colspan="6" style="text-align:center;padding:40px;color:#6b7280">Painel legado desativado.</td></tr>
         </tbody>
       </table>
     </div>
