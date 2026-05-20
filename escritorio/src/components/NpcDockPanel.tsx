@@ -7,6 +7,11 @@ import type { CharacterAppearance, LegacyCharacterAppearance } from "@/lib/lpc-r
 
 export interface NpcDockRecord {
   id: string;
+  channelId?: string | null;
+  channelName?: string | null;
+  clientName?: string | null;
+  channelType?: string | null;
+  roomLabel?: string | null;
   name: string;
   appearance?: unknown;
   runtimeProvider?: string | null;
@@ -69,9 +74,25 @@ export default function NpcDockPanel({
     return npcs.filter((npc) => {
       const provider = getProviderLabel(npc.runtimeProvider).toLowerCase();
       const model = (npc.model || "").toLowerCase();
-      return npc.name.toLowerCase().includes(normalized) || provider.includes(normalized) || model.includes(normalized);
+      const room = (npc.roomLabel || npc.clientName || npc.channelName || "").toLowerCase();
+      return npc.name.toLowerCase().includes(normalized) || provider.includes(normalized) || model.includes(normalized) || room.includes(normalized);
     });
   }, [deferredQuery, npcs]);
+
+  const groupedNpcs = useMemo(() => {
+    const groups = new Map<string, { label: string; items: NpcDockRecord[] }>();
+    for (const npc of filteredNpcs) {
+      const label = npc.roomLabel || npc.clientName || npc.channelName || "Sala atual";
+      const key = npc.channelId || label;
+      const current = groups.get(key);
+      if (current) {
+        current.items.push(npc);
+      } else {
+        groups.set(key, { label, items: [npc] });
+      }
+    }
+    return Array.from(groups.values());
+  }, [filteredNpcs]);
 
   const toggleExpanded = (id: string) => {
     setExpandedId((current) => (current === id ? null : id));
@@ -127,58 +148,75 @@ export default function NpcDockPanel({
               </p>
             </div>
           ) : (
-            <div className="space-y-1">
-              {filteredNpcs.map((npc) => {
-                const provider = getProviderLabel(npc.runtimeProvider);
-                const model = npc.model?.trim() || "Padrão do canal";
-                const automationCount = countEnabledRules(npc.automationRules);
-                const isExpanded = expandedId === npc.id;
-                const isSelected = selectedNpcId === npc.id;
+            <div className="space-y-3">
+              {groupedNpcs.map((group) => (
+                <div key={group.label} className="space-y-1">
+                  {groupedNpcs.length > 1 && (
+                    <div className="px-2 pb-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200/55">
+                      {group.label} · {group.items.length}
+                    </div>
+                  )}
+                  {group.items.map((npc) => {
+                    const provider = getProviderLabel(npc.runtimeProvider);
+                    const model = npc.model?.trim() || "Padrão do canal";
+                    const automationCount = countEnabledRules(npc.automationRules);
+                    const isExpanded = expandedId === npc.id;
+                    const isSelected = selectedNpcId === npc.id;
 
-                return (
-                  <div
-                    key={npc.id}
-                    className={`rounded-xl border transition-all ${
-                      isSelected
-                        ? "border-cyan-400/40 bg-cyan-500/10"
-                        : isExpanded
-                        ? "border-white/15 bg-white/5"
-                        : "border-transparent hover:border-white/10 hover:bg-white/5"
-                    }`}
-                  >
-                    {/* Linha compacta */}
-                    <button
-                      type="button"
-                      onClick={() => toggleExpanded(npc.id)}
-                      className="flex w-full items-center gap-2.5 px-2 py-1.5 text-left"
-                    >
-                      <RosterAvatar
-                        appearance={(npc.appearance as CharacterAppearance | LegacyCharacterAppearance | null) ?? null}
-                        size={32}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-sm text-white">{npc.name}</span>
-                      <ChevronDown
-                        className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${
-                          isExpanded ? "rotate-180" : ""
+                    return (
+                      <div
+                        key={npc.id}
+                        className={`rounded-xl border transition-all ${
+                          isSelected
+                            ? "border-cyan-400/40 bg-cyan-500/10"
+                            : isExpanded
+                            ? "border-white/15 bg-white/5"
+                            : "border-transparent hover:border-white/10 hover:bg-white/5"
                         }`}
-                      />
-                    </button>
+                      >
+                        {/* Linha compacta */}
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(npc.id)}
+                          className="flex w-full items-center gap-2.5 px-2 py-1.5 text-left"
+                        >
+                          <RosterAvatar
+                            appearance={(npc.appearance as CharacterAppearance | LegacyCharacterAppearance | null) ?? null}
+                            size={32}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm text-white">{npc.name}</span>
+                            {groupedNpcs.length <= 1 && npc.roomLabel && (
+                              <span className="block truncate text-[10px] text-slate-500">{npc.roomLabel}</span>
+                            )}
+                          </span>
+                          <ChevronDown
+                            className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+                              isExpanded ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
 
-                    {/* Accordion expandido */}
-                    {isExpanded && (
-                      <div className="border-t border-white/5 px-2.5 py-2.5">
-                        <div className="flex flex-wrap gap-1">
-                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${getProviderClass(npc.runtimeProvider)}`}>
-                            {provider}
-                          </span>
-                          <span className="rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-slate-300">
-                            {model}
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-slate-300">
-                            <Sparkles className="h-3 w-3 text-cyan-300" />
-                            {npc.hasAgent ? "Agente" : "Sem agente"}
-                          </span>
-                        </div>
+                        {/* Accordion expandido */}
+                        {isExpanded && (
+                          <div className="border-t border-white/5 px-2.5 py-2.5">
+                            <div className="flex flex-wrap gap-1">
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${getProviderClass(npc.runtimeProvider)}`}>
+                                {provider}
+                              </span>
+                              <span className="rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-slate-300">
+                                {model}
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-slate-300">
+                                <Sparkles className="h-3 w-3 text-cyan-300" />
+                                {npc.hasAgent ? "Agente" : "Sem agente"}
+                              </span>
+                              {npc.roomLabel && (
+                                <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-100">
+                                  {npc.roomLabel}
+                                </span>
+                              )}
+                            </div>
 
                         <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
                           <div className="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5">
@@ -232,11 +270,13 @@ export default function NpcDockPanel({
                             Editar
                           </button>
                         </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </div>

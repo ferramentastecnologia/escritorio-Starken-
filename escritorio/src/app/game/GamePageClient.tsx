@@ -120,6 +120,10 @@ interface ChannelPlayerSummary {
 interface ChannelNpcSummary {
   id: string;
   channelId?: string;
+  channelName?: string | null;
+  clientName?: string | null;
+  channelType?: string | null;
+  roomLabel?: string | null;
   name: string;
   appearance: unknown;
   direction?: string;
@@ -275,6 +279,7 @@ function GamePageInner() {
   const [rosterActionMenu, setRosterActionMenu] = useState<RosterActionMenu | null>(null);
   const [mode, setMode] = useState<"office" | "meeting">("office");
   const [channelNpcs, setChannelNpcs] = useState<ChannelNpcSummary[]>([]);
+  const [officeNpcs, setOfficeNpcs] = useState<ChannelNpcSummary[]>([]);
   const [channelPlayers, setChannelPlayers] = useState<ChannelPlayerSummary[]>([]);
 
   // Ref to track current dialogNpc for use inside socket listeners (must be declared before sync effect)
@@ -500,6 +505,31 @@ function GamePageInner() {
     setChannelNpcs(data.npcs || []);
   }, [channelId]);
 
+  const refreshOfficeNpcs = useCallback(async () => {
+    if (!channelId) return;
+
+    try {
+      const roomsResponse = await fetch(`/api/channels/office-rooms?channelId=${encodeURIComponent(channelId)}`);
+      if (!roomsResponse.ok) throw new Error("office rooms unavailable");
+      const roomsData = await roomsResponse.json();
+      const roomIds = Array.isArray(roomsData.rooms)
+        ? roomsData.rooms.map((room: { id?: string }) => room.id).filter(Boolean)
+        : [];
+
+      if (roomIds.length === 0) {
+        setOfficeNpcs(channelNpcs);
+        return;
+      }
+
+      const response = await fetch(`/api/npcs?channelIds=${encodeURIComponent(roomIds.join(","))}`);
+      if (!response.ok) throw new Error("office npcs unavailable");
+      const data = await response.json();
+      setOfficeNpcs(Array.isArray(data.npcs) ? data.npcs : []);
+    } catch {
+      setOfficeNpcs(channelNpcs);
+    }
+  }, [channelId, channelNpcs]);
+
   const appendPendingReportToDialog = useCallback((npcId: string, baseMessages: NpcChatMessage[]): NpcChatMessage[] => {
     const pendingReport = pendingNpcReportsRef.current.get(npcId);
     if (!pendingReport) return baseMessages;
@@ -593,7 +623,9 @@ function GamePageInner() {
 
       // NPCs pushed from server on join (faster than HTTP fetch)
       socketInstance.on("channel:npcs", (data: { npcs: unknown[] }) => {
-        if (!cancelled && data.npcs) setChannelNpcs(data.npcs as typeof channelNpcs);
+        if (!cancelled && data.npcs) {
+          setChannelNpcs(data.npcs as typeof channelNpcs);
+        }
       });
 
       // Channel chat history (sent on join)
@@ -1322,6 +1354,7 @@ function GamePageInner() {
 
     // Reset NPCs immediately on channel change to avoid showing content from previous room
     setChannelNpcs([]);
+    setOfficeNpcs([]);
 
     fetch(`/api/npcs?channelId=${channelId}`, { signal: controller.signal })
       .then(async (res) => {
@@ -1348,18 +1381,24 @@ function GamePageInner() {
   }, [channelId, t]);
 
   useEffect(() => {
-    if (!managedNpcId) return;
-    if (!channelNpcs.some((npc) => npc.id === managedNpcId)) {
-      setManagedNpcId(null);
-    }
-  }, [channelNpcs, managedNpcId]);
+    void refreshOfficeNpcs();
+  }, [refreshOfficeNpcs]);
 
   useEffect(() => {
-    if (!npcCommandId || channelNpcs.length === 0) return;
-    if (channelNpcs.some((npc) => npc.id === npcCommandId)) {
+    if (!managedNpcId) return;
+    const availableNpcs = officeNpcs.length > 0 ? officeNpcs : channelNpcs;
+    if (!availableNpcs.some((npc) => npc.id === managedNpcId)) {
+      setManagedNpcId(null);
+    }
+  }, [channelNpcs, officeNpcs, managedNpcId]);
+
+  useEffect(() => {
+    const availableNpcs = officeNpcs.length > 0 ? officeNpcs : channelNpcs;
+    if (!npcCommandId || availableNpcs.length === 0) return;
+    if (availableNpcs.some((npc) => npc.id === npcCommandId)) {
       setManagedNpcId(npcCommandId);
     }
-  }, [channelNpcs, npcCommandId]);
+  }, [channelNpcs, officeNpcs, npcCommandId]);
 
   // Track if Phaser scene is ready before syncing NPCs
   const sceneReadyRef = useRef(false);
@@ -1742,7 +1781,9 @@ function GamePageInner() {
     };
   }, [contextMenu, rosterActionMenu]);
 
-  const managedNpc = managedNpcId ? channelNpcs.find((npc) => npc.id === managedNpcId) ?? null : null;
+  const dockNpcs = officeNpcs.length > 0 ? officeNpcs : channelNpcs;
+  const managedNpc = managedNpcId ? dockNpcs.find((npc) => npc.id === managedNpcId) ?? null : null;
+  const managedNpcChannelId = managedNpc?.channelId || channelId;
 
   const handleCloseManagedNpc = useCallback(() => {
     setManagedNpcId(null);
@@ -1774,8 +1815,8 @@ function GamePageInner() {
         {!loading && !error && (
           <NpcDockPanel
             embedded
-            channelName={channel?.name || "Starken HQ"}
-            npcs={channelNpcs}
+            channelName={officeNpcs.length > 0 ? "Escritório completo" : (channel?.name || "Starken HQ")}
+            npcs={dockNpcs}
             selectedNpcId={managedNpcId}
             onManageNpc={(npcId) => postNpcDockAction("starken-os:npc-dock-manage", { npcId })}
             onTalkToNpc={(npcId, npcName) => postNpcDockAction("starken-os:npc-dock-talk", { npcId, npcName })}
@@ -1814,9 +1855,9 @@ function GamePageInner() {
           </div>
         )}
 
-        {!loading && !error && channelId && managedNpc && (
+        {!loading && !error && managedNpcChannelId && managedNpc && (
           <NpcCommandCenter
-            channelId={channelId}
+            channelId={managedNpcChannelId}
             characterId={characterId}
             npc={managedNpc}
             socket={socket}
@@ -1825,7 +1866,10 @@ function GamePageInner() {
             onOpenChat={(npcId, npcName) => postNpcDockAction("starken-os:npc-dock-talk", { npcId, npcName })}
             onEditNpc={(npcId) => EventBus.emit("npc:edit", { npcId })}
             onResetChat={(npcId) => handleResetNpcChatById(npcId)}
-            onNpcUpdated={() => refreshChannelNpcs()}
+            onNpcUpdated={() => {
+              void refreshChannelNpcs();
+              void refreshOfficeNpcs();
+            }}
             embedded
           />
         )}
@@ -2667,8 +2711,8 @@ function GamePageInner() {
 
       {mode === "office" && channelId && !hideEmbeddedNpcDock && (
         <NpcDockPanel
-          channelName={channel?.name || "Canal"}
-          npcs={channelNpcs}
+          channelName={officeNpcs.length > 0 ? "Escritório completo" : (channel?.name || "Canal")}
+          npcs={dockNpcs}
           selectedNpcId={managedNpcId}
           onManageNpc={handleOpenCommandCenterById}
           onTalkToNpc={(npcId, npcName) => handleSelectNpc(npcId, npcName)}
@@ -3070,7 +3114,7 @@ function GamePageInner() {
 
       {channelId && managedNpc && isOwner && (
         <NpcCommandCenter
-          channelId={channelId}
+          channelId={managedNpcChannelId || channelId}
           characterId={characterId}
           npc={managedNpc}
           socket={socket}
@@ -3079,7 +3123,10 @@ function GamePageInner() {
           onOpenChat={handleSelectNpc}
           onEditNpc={(npcId) => EventBus.emit("npc:edit", { npcId })}
           onResetChat={(npcId) => handleResetNpcChatById(npcId)}
-          onNpcUpdated={() => refreshChannelNpcs()}
+          onNpcUpdated={() => {
+            void refreshChannelNpcs();
+            void refreshOfficeNpcs();
+          }}
           embedded={npcCommandOnly}
         />
       )}
