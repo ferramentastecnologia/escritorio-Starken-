@@ -5050,6 +5050,12 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
 .ctl-client-week-title strong { display:block; color:var(--text); font-size:.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ctl-client-week-title small { display:block; color:var(--text-muted); font-size:.7rem; margin-top:2px; }
 .ctl-client-week-actions { display:flex; align-items:center; justify-content:flex-end; gap:7px; flex-wrap:wrap; }
+.ctl-client-week-action { min-height:32px; border:1px solid rgba(255,255,255,.10); border-radius:10px; background:rgba(13,18,30,.68); color:var(--text); padding:0 11px; display:inline-flex; align-items:center; gap:6px; font-size:.68rem; font-weight:950; text-transform:uppercase; letter-spacing:.03em; cursor:pointer; text-decoration:none; }
+.ctl-client-week-action.primary { background:#46eecd; border-color:#46eecd; color:#061512; }
+.ctl-client-week-action.warn { background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.38); color:#fbbf24; }
+.ctl-client-week-action.disabled { opacity:.42; cursor:not-allowed; }
+.ctl-client-week-next { margin:0 0 10px; border:1px solid rgba(70,238,205,.13); background:rgba(70,238,205,.055); border-radius:10px; padding:9px 10px; color:var(--text-muted); font-size:.72rem; line-height:1.35; }
+.ctl-client-week-next strong { color:var(--text); }
 .ctl-client-week-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; }
 .ctl-client-week-metric { border:1px solid rgba(255,255,255,.06); background:rgba(13,18,30,.54); border-radius:10px; padding:9px; min-height:64px; display:flex; flex-direction:column; justify-content:space-between; }
 .ctl-client-week-metric span { color:var(--text-muted); font-size:.62rem; font-weight:950; letter-spacing:.04em; text-transform:uppercase; }
@@ -5069,6 +5075,7 @@ textarea.ca-input { resize:vertical; min-height:90px; line-height:1.5; }
   .ctl-home-health-grid { grid-template-columns:1fr; }
   .ctl-client-week-head { flex-direction:column; }
   .ctl-client-week-actions { justify-content:flex-start; }
+  .ctl-client-week-action { flex:1 1 auto; justify-content:center; }
   .ctl-client-week-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .ctl-client-complement-row { grid-template-columns:1fr; }
 }
@@ -33114,9 +33121,19 @@ function clientTimelineClientWeekSummaryHtml(tasks) {
     open.length ? 'Resolver pendências' :
     'Semana controlada';
   var actions = '';
-  if (crono && crono.pdf_url) actions += '<a class="ctl-home-chip" href="' + ctlEsc(crono.pdf_url) + '" target="_blank" onclick="event.stopPropagation()" style="text-decoration:none">PDF</a>';
-  actions += '<button class="ctl-home-chip ' + (cronoStatus ? 'warn' : 'bad') + '" onclick="event.stopPropagation();clientTimelineOpenSelectedCronograma()">' + (cronoStatus ? 'Regenerar' : 'Gerar cronograma') + '</button>';
-  if (cronoStatus >= 1) actions += '<button class="ctl-home-chip ok" onclick="event.stopPropagation();clientTimelineSendSelectedCronograma()">Enviar</button>';
+  actions += '<button class="ctl-client-week-action ' + (cronoStatus ? 'warn' : 'primary') + '" onclick="event.stopPropagation();clientTimelineOpenSelectedCronograma()"><span class="mso">description</span>' + (cronoStatus ? 'Regenerar' : 'Gerar cronograma') + '</button>';
+  actions += crono && crono.pdf_url
+    ? '<a class="ctl-client-week-action" href="' + ctlEsc(crono.pdf_url) + '" target="_blank" onclick="event.stopPropagation()"><span class="mso">open_in_new</span>Abrir PDF</a>'
+    : '<span class="ctl-client-week-action disabled"><span class="mso">picture_as_pdf</span>Sem PDF</span>';
+  actions += cronoStatus >= 1
+    ? '<button class="ctl-client-week-action primary" onclick="event.stopPropagation();clientTimelineSendSelectedCronograma()"><span class="mso">send</span>Enviar</button>'
+    : '<span class="ctl-client-week-action disabled"><span class="mso">send</span>Enviar</span>';
+  var nextHint = cronoStatus === 0 ? 'Ainda não existe cronograma para esta semana. Gere primeiro, depois confira o PDF e envie ao cliente.' :
+    cronoStatus === 1 ? 'Cronograma gerado, mas ainda não consta como enviado. Confira o PDF e envie pelo botão ao lado.' :
+    complements.length ? 'Cronograma enviado. Existem ações complementares abertas depois do envio.' :
+    approvals.length ? 'Cronograma enviado. O foco agora é fechar aprovações pendentes.' :
+    open.length ? 'Cronograma enviado. Ainda existem pendências operacionais nesta semana.' :
+    'Cronograma enviado e semana sem pendências abertas neste recorte.';
   var metrics = [
     ['Cronograma', cronoLabel, cronoTone],
     ['Posts semana', tasks.length, tasks.length ? 'ok' : 'warn'],
@@ -33145,6 +33162,7 @@ function clientTimelineClientWeekSummaryHtml(tasks) {
       '</div>' +
       '<div class="ctl-client-week-actions">' + actions + '</div>' +
     '</div>' +
+    '<div class="ctl-client-week-next"><strong>Próximo passo:</strong> ' + ctlEsc(nextStep) + '. ' + ctlEsc(nextHint) + '</div>' +
     '<div class="ctl-client-week-grid">' + metrics + '</div>' +
     complementRows +
   '</div>';
