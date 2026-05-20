@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatorio de Performance - Suprema Pizza</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand-primary:#10b981;
+  --brand-secondary:#0d9488;
+  --brand-light:#6ee7b7;
+  --brand-dark:#059669;
+  --bg-dark:#020617;
+  --bg-surface:#0f172a;
+  --bg-elevated:#1e293b;
+  --bg-soft:#10231f;
+  --text-primary:#ffffff;
+  --text-secondary:#94a3b8;
+  --text-muted:#64748b;
+  --line:rgba(255,255,255,.09);
+  --success:#10b981;
+  --warning:#f59e0b;
+  --danger:#ef4444;
+  --info:#3b82f6;
+  --font-body:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --font-display:'Sora','Inter',sans-serif;
+  --shadow-brand:0 16px 48px rgba(16,185,129,.22);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+@page{size:A4;margin:0}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{
+  min-height:100vh;
+  font-family:var(--font-body);
+  background:
+    radial-gradient(circle at 18% 8%,rgba(16,185,129,.18),transparent 32%),
+    radial-gradient(circle at 82% 18%,rgba(13,148,136,.16),transparent 30%),
+    linear-gradient(135deg,#020617 0%,#061512 48%,#0f172a 100%);
+  color:var(--text-primary);
+  line-height:1.6;
+}
+body:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  opacity:.16;
+  background-image:
+    linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+.page{
+  position:relative;
+  max-width:980px;
+  margin:28px auto;
+  padding:48px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:linear-gradient(180deg,rgba(15,23,42,.96),rgba(2,6,23,.96));
+  box-shadow:0 24px 60px rgba(0,0,0,.36);
+  overflow:hidden;
+  page-break-after:always;
+}
+.page:after{
+  content:"";
+  position:absolute;
+  inset:auto -90px -150px auto;
+  width:280px;
+  height:280px;
+  border:1px solid rgba(16,185,129,.14);
+  border-radius:50%;
+}
+.cover{
+  min-height:82vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.topbar,.meta-row,.split,.campaign-head,.footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.brand img{
+  width:42px;
+  height:42px;
+  object-fit:contain;
+  border-radius:10px;
+  background:#fff;
+  padding:6px;
+}
+.brand strong{
+  font-family:var(--font-display);
+  letter-spacing:.02em;
+}
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  width:max-content;
+  border:1px solid rgba(16,185,129,.3);
+  border-radius:999px;
+  background:rgba(16,185,129,.11);
+  color:var(--brand-light);
+  padding:7px 12px;
+  font-size:.72rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.cover-title{
+  max-width:780px;
+  padding:70px 0 46px;
+}
+h1,h2,h3{
+  font-family:var(--font-display);
+  line-height:1.08;
+  letter-spacing:0;
+}
+h1{
+  margin-top:18px;
+  font-size:4.25rem;
+  font-weight:800;
+}
+h1 span{
+  display:block;
+  color:var(--brand-light);
+}
+.subtitle{
+  max-width:720px;
+  margin-top:20px;
+  color:var(--text-secondary);
+  font-size:1.12rem;
+}
+h2{
+  margin:14px 0 18px;
+  font-size:2rem;
+}
+h3{
+  margin:22px 0 10px;
+  font-size:1.1rem;
+}
+p{color:var(--text-secondary)}
+.period-card{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:14px;
+}
+.mini{
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(255,255,255,.04);
+  padding:16px;
+}
+.mini .label,.kpi .label,.metric-label{
+  color:var(--text-muted);
+  font-size:.77rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-weight:800;
+}
+.mini .value{
+  margin-top:7px;
+  color:#fff;
+  font-size:1rem;
+  font-weight:800;
+}
+.kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:14px;
+  margin:24px 0;
+}
+.kpi{
+  min-height:128px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025));
+  padding:18px;
+}
+.kpi .value{
+  display:block;
+  margin:12px 0 6px;
+  color:var(--brand-light);
+  font-family:var(--font-display);
+  font-size:1.75rem;
+  font-weight:800;
+}
+.kpi .hint{
+  color:var(--text-secondary);
+  font-size:.84rem;
+}
+.hero-kpi{
+  grid-column:span 2;
+  background:linear-gradient(135deg,rgba(16,185,129,.2),rgba(13,148,136,.07));
+  border-color:rgba(16,185,129,.34);
+  box-shadow:var(--shadow-brand);
+}
+.hero-kpi .value{font-size:2.25rem}
+.section-divider{
+  height:1px;
+  margin:28px 0;
+  background:linear-gradient(90deg,transparent,rgba(16,185,129,.52),transparent);
+}
+.campaign{
+  margin:18px 0;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:rgba(255,255,255,.035);
+  overflow:hidden;
+}
+.campaign-head{
+  padding:18px 20px;
+  border-bottom:1px solid var(--line);
+  background:rgba(16,185,129,.08);
+}
+.campaign-title{
+  font-family:var(--font-display);
+  font-size:1rem;
+  font-weight:800;
+}
+.tag{
+  color:var(--brand-light);
+  font-size:.73rem;
+  font-weight:800;
+  letter-spacing:.04em;
+}
+.metrics{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:1px;
+  background:var(--line);
+}
+.metric{
+  background:#0b1324;
+  padding:14px;
+}
+.metric strong{
+  display:block;
+  margin-top:3px;
+  color:#fff;
+  font-size:1rem;
+}
+.translate{
+  padding:18px 20px;
+  color:var(--text-secondary);
+}
+.translate strong{color:#fff}
+.insight,.warning{
+  margin:16px 0;
+  padding:18px 20px;
+  border-radius:14px;
+  border:1px solid rgba(16,185,129,.18);
+  background:rgba(16,185,129,.08);
+}
+.warning{
+  border-color:rgba(245,158,11,.24);
+  background:rgba(245,158,11,.09);
+}
+.insight strong,.warning strong{color:#fff}
+.funnel{
+  display:grid;
+  gap:12px;
+  margin:22px 0;
+}
+.funnel-step{
+  display:grid;
+  grid-template-columns:170px 1fr 80px;
+  align-items:center;
+  gap:14px;
+}
+.bar-track{
+  height:34px;
+  border-radius:999px;
+  background:rgba(255,255,255,.07);
+  overflow:hidden;
+}
+.bar{
+  height:100%;
+  min-width:7%;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--brand-primary),var(--brand-secondary));
+}
+.funnel-value{
+  color:#fff;
+  font-weight:800;
+  text-align:right;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:18px;
+  overflow:hidden;
+  border-radius:14px;
+}
+th,td{
+  padding:13px 14px;
+  border-bottom:1px solid var(--line);
+  text-align:left;
+}
+th{
+  color:var(--brand-light);
+  background:rgba(16,185,129,.1);
+  font-size:.76rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+td{color:#e2e8f0}
+.positive{color:#6ee7b7;font-weight:800}
+.muted{color:var(--text-muted)}
+.two-col{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+  margin-top:18px;
+}
+.callout-list{
+  display:grid;
+  gap:12px;
+  margin-top:12px;
+}
+.callout-list li{
+  list-style:none;
+  color:var(--text-secondary);
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(255,255,255,.035);
+  padding:15px;
+}
+.callout-list strong{color:#fff}
+.footer{
+  position:relative;
+  margin-top:34px;
+  padding-top:18px;
+  border-top:1px solid var(--line);
+  color:var(--text-muted);
+  font-size:.82rem;
+}
+@media(max-width:760px){
+  .page{margin:0;border-radius:0;padding:28px}
+  h1{font-size:2.8rem}
+  .kpi-grid,.period-card,.metrics,.two-col{grid-template-columns:1fr}
+  .hero-kpi{grid-column:span 1}
+  .funnel-step{grid-template-columns:1fr}
+  .funnel-value{text-align:left}
+  .topbar,.meta-row,.campaign-head,.footer{align-items:flex-start;flex-direction:column}
+}
+@media print{
+  body{background:#fff;color:#0f172a}
+  body:before{display:none}
+  .page{box-shadow:none;margin:0;max-width:none;border-radius:0;border:0;background:#fff;color:#0f172a}
+  .page:after{display:none}
+  h1,h2,h3,.mini .value,.kpi .value,.campaign-title,.metric strong,td,.funnel-value{color:#0f172a}
+  p,.subtitle,.translate,.callout-list li{color:#334155}
+  .kpi,.mini,.campaign,.metric,.callout-list li{border:1px solid #dbe4ee;background:#fff}
+  .campaign-head,th{background:#ecfdf5}
+  .badge{color:#047857;border-color:#10b981;background:#ecfdf5}
+}
+</style>
+</head>
+<body>
+
+<section class="page cover">
+  <div class="topbar">
+    <div class="brand">
+      <img src="/starken-os/logo-starken-tecnologia-square.png" alt="Starken Tecnologia">
+      <strong>Starken Tecnologia</strong>
+    </div>
+    <span class="badge">Relatorio de Performance</span>
+  </div>
+
+  <div class="cover-title">
+    <span class="badge">Inteligencia de Trafego - Gastronomia</span>
+    <h1>Suprema <span>Pizza</span></h1>
+    <p class="subtitle">Leitura executiva de performance em campanhas de venda, aquisicao de publico e conversao no cardapio proprio.</p>
+  </div>
+
+  <div class="period-card">
+    <div class="mini">
+      <div class="label">Periodo informado</div>
+      <div class="value">01/05/2026 a N/A</div>
+    </div>
+    <div class="mini">
+      <div class="label">Data de geracao</div>
+      <div class="value">20/05/2026</div>
+    </div>
+    <div class="mini">
+      <div class="label">Cliente</div>
+      <div class="value">Suprema Pizza</div>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <span class="badge">Resumo Executivo</span>
+  <h2>Resultado consolidado</h2>
+  <p>As campanhas somaram um volume expressivo de alcance e conversao, com destaque para as campanhas de venda no cardapio proprio. A leitura principal e simples: o investimento total gerou receita rastreada consistente e ROAS consolidado de 20,24.</p>
+
+  <div class="kpi-grid">
+    <div class="kpi hero-kpi">
+      <div class="label">Receita rastreada</div>
+      <span class="value">R$ 24.712,87</span>
+      <div class="hint">Faturamento atribuido as campanhas analisadas.</div>
+    </div>
+    <div class="kpi hero-kpi">
+      <div class="label">ROAS consolidado</div>
+      <span class="value">20,24</span>
+      <div class="hint">Cada R$ 1 investido retornou R$ 20,24 em vendas rastreadas.</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Investimento total</div>
+      <span class="value">R$ 1.221,16</span>
+      <div class="hint">Distribuido entre aquisicao e vendas.</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Compras</div>
+      <span class="value">201</span>
+      <div class="hint">Pedidos rastreados nas campanhas.</div>
+    </div>
+    <div class="kpi">
+      <div class="label">CPA</div>
+      <span class="value">R$ 6,08</span>
+      <div class="hint">Custo medio por compra.</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Ticket medio</div>
+      <span class="value">R$ 122,95</span>
+      <div class="hint">Valor medio por compra rastreada.</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Alcance</div>
+      <span class="value">85.968</span>
+      <div class="hint">Pessoas alcancadas.</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Impressoes</div>
+      <span class="value">248.258</span>
+      <div class="hint">Exibicoes totais dos anuncios.</div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <strong>Leitura Starkën:</strong> o motor de vendas esta saudavel. A campanha de Maio apresenta o melhor retorno relativo, enquanto Fevereiro sustenta escala com volume alto. A campanha de perfil cumpre papel de topo de funil e reforco de marca.
+  </div>
+</section>
+
+<section class="page">
+  <span class="badge">Campanhas</span>
+  <h2>Performance por campanha</h2>
+
+  <article class="campaign">
+    <div class="campaign-head">
+      <div>
+        <div class="campaign-title">Performance no Cardapio Proprio</div>
+        <div class="tag">[STARKEN][PERFIL][SEGUIDORES]</div>
+      </div>
+      <span class="badge">Aquisicao</span>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Investimento</div><strong>R$ 194,13</strong></div>
+      <div class="metric"><div class="metric-label">Alcance</div><strong>34.483</strong></div>
+      <div class="metric"><div class="metric-label">Impressoes</div><strong>47.639</strong></div>
+      <div class="metric"><div class="metric-label">Visitas ao perfil</div><strong>929</strong></div>
+      <div class="metric"><div class="metric-label">Custo por visita</div><strong>R$ 0,21</strong></div>
+      <div class="metric"><div class="metric-label">Compras</div><strong>2</strong></div>
+      <div class="metric"><div class="metric-label">Receita</div><strong>R$ 198,33</strong></div>
+      <div class="metric"><div class="metric-label">ROAS</div><strong>1,02</strong></div>
+    </div>
+    <div class="translate"><strong>Traduzindo:</strong> campanha voltada para aquisicao de publico, reconhecimento regional e novos seguidores. As vendas rastreadas aqui entram como ganho adicional de performance.</div>
+  </article>
+
+  <article class="campaign">
+    <div class="campaign-head">
+      <div>
+        <div class="campaign-title">Performance no Cardapio Proprio</div>
+        <div class="tag">[STARKEN][VENDAS][FEV]</div>
+      </div>
+      <span class="badge">Escala</span>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Investimento</div><strong>R$ 733,09</strong></div>
+      <div class="metric"><div class="metric-label">Alcance</div><strong>40.403</strong></div>
+      <div class="metric"><div class="metric-label">Impressoes</div><strong>150.677</strong></div>
+      <div class="metric"><div class="metric-label">Carrinhos</div><strong>175</strong></div>
+      <div class="metric"><div class="metric-label">Checkouts</div><strong>115</strong></div>
+      <div class="metric"><div class="metric-label">Compras</div><strong>113</strong></div>
+      <div class="metric"><div class="metric-label">Receita</div><strong>R$ 13.898,76</strong></div>
+      <div class="metric"><div class="metric-label">ROAS</div><strong>18,96</strong></div>
+    </div>
+    <div class="translate"><strong>Traduzindo:</strong> cada R$ 1 investido retornou mais de R$ 18 em vendas. O ticket medio foi de R$ 123,00, com CPA de R$ 6,49.</div>
+  </article>
+
+  <article class="campaign">
+    <div class="campaign-head">
+      <div>
+        <div class="campaign-title">Performance no Cardapio Proprio</div>
+        <div class="tag">[STARKEN][VENDAS][MAIO][01]</div>
+      </div>
+      <span class="badge">Melhor retorno</span>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Investimento</div><strong>R$ 293,94</strong></div>
+      <div class="metric"><div class="metric-label">Alcance</div><strong>11.082</strong></div>
+      <div class="metric"><div class="metric-label">Impressoes</div><strong>49.942</strong></div>
+      <div class="metric"><div class="metric-label">Carrinhos</div><strong>119</strong></div>
+      <div class="metric"><div class="metric-label">Checkouts</div><strong>86</strong></div>
+      <div class="metric"><div class="metric-label">Compras</div><strong>86</strong></div>
+      <div class="metric"><div class="metric-label">Receita</div><strong>R$ 10.615,78</strong></div>
+      <div class="metric"><div class="metric-label">ROAS</div><strong>36,12</strong></div>
+    </div>
+    <div class="translate"><strong>Traduzindo:</strong> campanha extremamente eficiente. Cada R$ 1 investido retornou mais de R$ 36 em vendas, com CPA de R$ 3,42 e ticket medio de R$ 123,44.</div>
+  </article>
+</section>
+
+<section class="page">
+  <span class="badge">Funil</span>
+  <h2>Leitura de conversao</h2>
+  <p>O funil mostra uma boa passagem entre carrinho, checkout e compra nas campanhas de venda. O dado mais forte esta na campanha de Maio, em que 86 checkouts viraram 86 compras rastreadas.</p>
+
+  <div class="funnel">
+    <div class="funnel-step">
+      <strong>Impressoes</strong>
+      <div class="bar-track"><div class="bar" style="width:100%"></div></div>
+      <div class="funnel-value">248.258</div>
+    </div>
+    <div class="funnel-step">
+      <strong>Alcance</strong>
+      <div class="bar-track"><div class="bar" style="width:35%"></div></div>
+      <div class="funnel-value">85.968</div>
+    </div>
+    <div class="funnel-step">
+      <strong>Visitas perfil</strong>
+      <div class="bar-track"><div class="bar" style="width:12%"></div></div>
+      <div class="funnel-value">929</div>
+    </div>
+    <div class="funnel-step">
+      <strong>Carrinhos</strong>
+      <div class="bar-track"><div class="bar" style="width:16%"></div></div>
+      <div class="funnel-value">297</div>
+    </div>
+    <div class="funnel-step">
+      <strong>Checkouts</strong>
+      <div class="bar-track"><div class="bar" style="width:11%"></div></div>
+      <div class="funnel-value">203</div>
+    </div>
+    <div class="funnel-step">
+      <strong>Compras</strong>
+      <div class="bar-track"><div class="bar" style="width:10%"></div></div>
+      <div class="funnel-value">201</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="insight">
+      <strong>Forca principal:</strong> as campanhas de venda estao convertendo com eficiencia alta. O ROAS de Maio indica que existe oportunidade de escalar com cuidado.
+    </div>
+    <div class="warning">
+      <strong>Ponto de atencao:</strong> a campanha de perfil deve continuar sendo lida como aquisicao e reconhecimento, nao como campanha principal de venda.
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <span class="badge">Inteligencia</span>
+  <h2>Diagnostico e proximas acoes</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Indicador</th>
+        <th>Resultado</th>
+        <th>Leitura operacional</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>ROAS consolidado</td>
+        <td class="positive">20,24</td>
+        <td>Resultado muito acima do minimo saudavel para gastronomia.</td>
+      </tr>
+      <tr>
+        <td>CPA consolidado</td>
+        <td class="positive">R$ 6,08</td>
+        <td>Custo baixo para ticket medio de R$ 122,95.</td>
+      </tr>
+      <tr>
+        <td>Campanha Maio</td>
+        <td class="positive">ROAS 36,12</td>
+        <td>Principal candidata para escala controlada.</td>
+      </tr>
+      <tr>
+        <td>Campanha Perfil</td>
+        <td>929 visitas</td>
+        <td>Boa campanha de aquisicao e fortalecimento de marca.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-divider"></div>
+
+  <h3>Proximas acoes recomendadas</h3>
+  <ul class="callout-list">
+    <li><strong>Escalar com controle a campanha de Maio:</strong> aumentar verba em etapas pequenas e monitorar se o CPA permanece abaixo da faixa saudavel.</li>
+    <li><strong>Separar verba de aquisicao e venda:</strong> manter campanha de seguidores/perfil como topo de funil e proteger campanhas de compra como motor de receita.</li>
+    <li><strong>Reforcar criativos vencedores:</strong> transformar os melhores produtos e ofertas em novas variacoes para reduzir fadiga e manter frequencia saudavel.</li>
+    <li><strong>Acompanhar cardapio e checkout:</strong> manter atencao nos pontos de atrito entre carrinho, finalizacao e compra para preservar a eficiencia atual.</li>
+  </ul>
+
+  <div class="footer">
+    <span>Starken Tecnologia - Relatorio de Performance</span>
+    <span>Suprema Pizza - 20/05/2026</span>
+  </div>
+</section>
+
+</body>
+</html>
