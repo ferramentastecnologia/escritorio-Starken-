@@ -42224,9 +42224,8 @@ function npcBuildContext(scope, baseCtx) {
 
 function npcSwitchDrawerContext(scope) {
   _npcState.context = npcBuildContext(scope, _npcState.context);
-  var npc = npcProfile(_npcState.activeNpc);
   var sub = document.getElementById('npcDrawerSub');
-  if (sub) sub.textContent = npcContextSnapshot(_npcState.context) + ' ' + (npc.seed || '');
+  if (sub) sub.textContent = npcContextSnapshot(_npcState.context);
   npcRenderDrawerContext();
   npcRenderChat();
   npcHydrateAvatars();
@@ -42639,7 +42638,7 @@ window.addEventListener('message', function(event) {
 });
 
 function npcCardSummary(npc) {
-  var text = (npc && (npc.role || npc.seed || npc.description)) || 'NPC real do Escritório Virtual conectado ao Starken OS.';
+  var text = (npc && (npc.role || npc.description)) || 'NPC real do Escritório Virtual conectado ao Starken OS.';
   text = String(text).replace(/\s+/g, ' ').trim();
   return text.length > 150 ? text.slice(0, 147).trim() + '...' : text;
 }
@@ -42721,7 +42720,7 @@ function orgCard(npc) {
     '<div class="org-card-head"><div class="org-avatar" style="border-color:' + npcEsc(npc.color || '#46eecd') + '">' + npcEsc(npc.initials || '?') + '</div>' +
       '<div><h3>' + npcEsc(npc.name) + '</h3><p>' + npcEsc(npc.role || '') + '</p></div></div>' +
     '<div class="org-chiprow">' + orgAccessChip(npc) + '<span class="org-chip muted">' + npcEsc(meta.squad) + '</span><span class="org-chip ' + (meta.clientFacing ? '' : 'muted') + '">' + npcEsc(canTalk) + '</span></div>' +
-    '<p>' + npcEsc(npc.seed || 'Especialista conectado ao Starken OS.') + '</p>' +
+    '<p>' + npcEsc(npc.role || 'Especialista conectado ao Starken OS.') + '</p>' +
     '<div class="org-chiprow">' + (npc.domains || []).slice(0, 4).map(function(d) { return '<span class="org-chip muted">' + npcEsc(d) + '</span>'; }).join('') + '</div>' +
   '</div>';
 }
@@ -42974,7 +42973,7 @@ window.addEventListener('message', function(event) {
 function npcMemoryPreviewHtml(npc) {
   var memories = npcGetMemories(npc.id, { scope:'global', section:'npc-center' });
   var globalRows = memories.global.slice(0, 5);
-  var seedHtml = '<div class="npc-list-item"><strong>Memória base do Escritório</strong>' + npcEsc(npc.seed || '') + '</div>';
+  var seedHtml = '<div class="npc-list-item"><strong>Memória base do Escritório</strong>Instruções completas, persona e arquivos sincronizados ficam disponíveis apenas na aba Configuração e no Command Center real do Escritório Virtual.</div>';
   return seedHtml + (globalRows.length ? globalRows.map(function(m) {
     return '<div class="npc-list-item"><strong>' + new Date(m.at).toLocaleString('pt-BR') + '</strong>' + npcEsc(m.text) + '</div>';
   }).join('') : '<div class="npc-empty"><span class="mso">memory</span><br>Nenhuma memória manual salva neste navegador para este NPC.<br>A base real fica em <strong>agent-memory/' + npcEsc(npc.memorySlug) + '</strong>.</div>');
@@ -43062,7 +43061,7 @@ function npcCommandBodyHtml(npc) {
   if (tab === 'config') {
     return '<div class="npc-panel"><h3><span class="mso">settings</span> Configuração do NPC</h3><div class="npc-config-grid"><label>Nome do NPC<input id="npcCfgName" value="' + npcEsc(npc.name) + '"></label><label>Runtime<input value="' + npcEsc(npc.runtime || 'Codex') + '" disabled></label><label>Função<input id="npcCfgRole" value="' + npcEsc(npc.role) + '"></label><label>Tom<input id="npcCfgTone" value="' + npcEsc(npc.tone || '') + '"></label><label>Persona / memória base<textarea id="npcCfgSeed">' + npcEsc(npc.identity || npc.seed || '') + '</textarea></label></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="npc-btn primary" onclick="npcSaveLocalConfig()"><span class="mso">save</span> Salvar rascunho local</button><button class="npc-btn" onclick="npcOpenOfficeRoom(\'' + npcEsc(npc.id) + '\')"><span class="mso">open_in_new</span> Abrir Escritório Virtual</button></div></div>';
   }
-  return npcCommandMetricsHtml(npc) + '<div class="npc-command-layout"><div class="npc-panel"><h3><span class="mso">badge</span> Identidade operacional</h3><div class="npc-mini-grid"><div class="npc-mini-card"><strong>Função</strong>' + npcEsc(npc.role) + '</div><div class="npc-mini-card"><strong>Soul / tom</strong>' + npcEsc(npc.tone || 'Direto e útil') + '</div><div class="npc-mini-card"><strong>Base real</strong>' + npcEsc('agentId: ' + npc.agentId) + '</div><div class="npc-mini-card"><strong>Memória</strong>' + npcEsc('agent-memory/' + npc.memorySlug) + '</div></div><div style="margin-top:14px" class="npc-list-item"><strong>Como ele trabalha</strong>' + npcEsc(npc.seed || '') + '</div></div><div class="npc-panel"><h3><span class="mso">chat</span> Conversa recente</h3>' + npcRecentConversationHtml(npc) + '</div></div><div class="npc-command-layout"><div class="npc-panel"><h3><span class="mso">assignment</span> Últimas tarefas</h3><div class="npc-empty"><strong>Nenhuma tarefa vinculada nesta tela</strong><br>Quando uma task for atribuída ao NPC, ela aparece aqui por cliente e por menu.</div></div><div class="npc-panel"><h3><span class="mso">groups</span> Memória de reunião</h3><div class="npc-empty"><strong>Sem reuniões relevantes</strong><br>Quando este NPC participar de reunião, decisões e próximos passos aparecem aqui.</div></div></div>';
+  return npcCommandMetricsHtml(npc) + '<div class="npc-command-layout"><div class="npc-panel"><h3><span class="mso">badge</span> Identidade operacional</h3><div class="npc-mini-grid"><div class="npc-mini-card"><strong>Função</strong>' + npcEsc(npc.role) + '</div><div class="npc-mini-card"><strong>Soul / tom</strong>' + npcEsc(npc.tone || 'Direto e útil') + '</div><div class="npc-mini-card"><strong>Base real</strong>' + npcEsc('agentId: ' + npc.agentId) + '</div><div class="npc-mini-card"><strong>Memória</strong>' + npcEsc('agent-memory/' + npc.memorySlug) + '</div></div><div style="margin-top:14px" class="npc-list-item"><strong>Como ele trabalha</strong>' + npcEsc(npc.role || 'NPC operacional conectado ao Escritório Virtual.') + '<br><small>As instruções completas aparecem somente em Configuração.</small></div></div><div class="npc-panel"><h3><span class="mso">chat</span> Conversa recente</h3>' + npcRecentConversationHtml(npc) + '</div></div><div class="npc-command-layout"><div class="npc-panel"><h3><span class="mso">assignment</span> Últimas tarefas</h3><div class="npc-empty"><strong>Nenhuma tarefa vinculada nesta tela</strong><br>Quando uma task for atribuída ao NPC, ela aparece aqui por cliente e por menu.</div></div><div class="npc-panel"><h3><span class="mso">groups</span> Memória de reunião</h3><div class="npc-empty"><strong>Sem reuniões relevantes</strong><br>Quando este NPC participar de reunião, decisões e próximos passos aparecem aqui.</div></div></div>';
 }
 
 function npcRenderDetail(npcId) {
@@ -43129,7 +43128,7 @@ function npcOpenDrawer(npcId, ctx) {
   if (drawerAvatarEl) drawerAvatarEl.outerHTML = npcAvatarHtml(npc, 'drawer', 'npcDrawerAvatar');
   document.getElementById('npcDrawerName').textContent = npc.name;
   document.getElementById('npcDrawerRole').textContent = npc.role;
-  document.getElementById('npcDrawerSub').textContent = npcContextSnapshot(_npcState.context) + ' ' + (npc.seed || '');
+  document.getElementById('npcDrawerSub').textContent = npcContextSnapshot(_npcState.context);
   npcRenderDrawerContext();
   npcRenderChat();
   backdrop.classList.add('open');
@@ -43173,7 +43172,7 @@ function npcRenderDrawerContext() {
   var memories = npcGetMemories(npcId, ctx);
   box.innerHTML = '<span class="npc-pill">' + npcEsc(npcContextLabel(ctx)) + '</span><span class="npc-pill">' + npcEsc(ctx.section || 'geral') + '</span><span class="npc-pill">' + npcEsc(memories.bucket) + '</span><span class="npc-pill">' + npcEsc(npc.agentId) + '</span>';
   var total = memories.global.length + memories.scoped.length;
-  mem.innerHTML = (npc.seed ? '<strong>Base:</strong> ' + npcEsc(npc.seed) + '<br>' : '') + (total
+  mem.innerHTML = (total
     ? 'Memória manual carregada: ' + memories.global.length + ' global(is) + ' + memories.scoped.length + ' deste contexto.'
     : 'Sem memória manual salva ainda neste contexto. Use "lembrar: ..." para registrar aprendizado.');
 }
