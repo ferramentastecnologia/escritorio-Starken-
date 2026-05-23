@@ -1792,14 +1792,23 @@ function GamePageInner() {
     }
   }, [npcCommandOnly]);
 
-  const postNpcDockAction = useCallback((type: string, payload: Record<string, unknown>) => {
-    if (typeof window === "undefined" || !window.parent || window.parent === window) return;
-    window.parent.postMessage({ type, ...payload }, window.location.origin);
-  }, []);
+  const dockChatOpen = Boolean(dialogNpc || npcSelectList || channelChatOpen);
+
+  useEffect(() => {
+    if (!npcDockOnly || typeof window === "undefined" || !window.parent || window.parent === window) return;
+    window.parent.postMessage({ type: "starken-os:npc-dock-chat-state", open: dockChatOpen }, window.location.origin);
+  }, [dockChatOpen, npcDockOnly]);
+
+  useEffect(() => {
+    return () => {
+      if (!npcDockOnly || typeof window === "undefined" || !window.parent || window.parent === window) return;
+      window.parent.postMessage({ type: "starken-os:npc-dock-chat-state", open: false }, window.location.origin);
+    };
+  }, [npcDockOnly]);
 
   if (npcDockOnly) {
     return (
-      <div className="h-screen w-screen overflow-hidden bg-[#0d1222] text-white">
+      <div className="relative h-screen w-screen overflow-hidden bg-[#0d1222] text-white">
         {loading && (
           <div className="flex h-screen items-center justify-center text-slate-300">
             Carregando agentes...
@@ -1813,16 +1822,102 @@ function GamePageInner() {
         )}
 
         {!loading && !error && (
-          <NpcDockPanel
-            embedded
-            channelName={officeNpcs.length > 0 ? "Escritório completo" : (channel?.name || "Starken HQ")}
-            npcs={dockNpcs}
-            selectedNpcId={managedNpcId}
-            onManageNpc={(npcId) => postNpcDockAction("starken-os:npc-dock-manage", { npcId })}
-            onTalkToNpc={(npcId, npcName) => postNpcDockAction("starken-os:npc-dock-talk", { npcId, npcName })}
-            onEditNpc={(npcId) => postNpcDockAction("starken-os:npc-dock-edit", { npcId })}
-            onHireNpc={() => postNpcDockAction("starken-os:npc-dock-hire", {})}
-          />
+          <>
+            <div className="absolute inset-y-0 right-0 z-30 w-[260px]">
+              <NpcDockPanel
+                embedded
+                channelName={officeNpcs.length > 0 ? "Escritório completo" : (channel?.name || "Starken HQ")}
+                npcs={dockNpcs}
+                selectedNpcId={managedNpcId || dialogNpc?.npcId || null}
+                onManageNpc={handleOpenCommandCenterById}
+                onTalkToNpc={(npcId, npcName) => handleSelectNpc(npcId, npcName)}
+                onEditNpc={(npcId) => EventBus.emit("npc:edit", { npcId })}
+                onHireNpc={() => {
+                  setEditingNpc(null);
+                  setShowHireModal(true);
+                }}
+              />
+            </div>
+
+            <ChatPanel
+              dialogNpc={dialogNpc}
+              npcMessages={npcMessages}
+              isNpcStreaming={isNpcStreaming}
+              npcChatInputDisabled={!socketConnected}
+              npcChatDisabledPlaceholder={t("chat.disconnected")}
+              onSend={handleDialogSend}
+              onClose={handleDialogClose}
+              npcSelectList={npcSelectList}
+              onSelectNpc={handleSelectNpc}
+              isOwner={isOwner}
+              onEditNpc={(npcId) => EventBus.emit("npc:edit", { npcId })}
+              onFireNpc={(npcId) => EventBus.emit("npc:fire", { npcId })}
+              onResetNpcChat={(npcId) => {
+                if (socketRef.current) socketRef.current.emit("npc:reset-chat", { npcId });
+                setNpcMessages([]);
+              }}
+              channelMessages={channelMessages}
+              channelChatOpen={channelChatOpen}
+              channelChatInputDisabled={channelChatInputDisabled || !socketConnected}
+              onSendChannelChat={handleChannelChatSend}
+              currentPlayerName={character?.name}
+              currentCharacterId={characterId}
+              npcMoveState={dialogNpc ? npcMoveStates[dialogNpc.npcId] : undefined}
+              onReturnNpc={dialogNpc && npcCallers[dialogNpc.npcId] === socket?.id ? handleReturnNpc : undefined}
+              socket={socket}
+              channelId={channelId}
+              assignerCharacterId={characterId}
+              onDeleteTask={deleteTask}
+              onRequestReportTask={requestTaskReport}
+              onResumeTask={resumeTask}
+              onCompleteTask={completeTask}
+              dockSide="right"
+              dockOffset={260}
+              dockTop={0}
+            />
+
+            {channelId && managedNpc && isOwner && (
+              <NpcCommandCenter
+                channelId={managedNpcChannelId || channelId}
+                characterId={characterId}
+                npc={managedNpc}
+                socket={socket}
+                isOpen={Boolean(managedNpc)}
+                onClose={handleCloseManagedNpc}
+                onOpenChat={handleSelectNpc}
+                onEditNpc={(npcId) => EventBus.emit("npc:edit", { npcId })}
+                onResetChat={(npcId) => handleResetNpcChatById(npcId)}
+                onNpcUpdated={() => {
+                  void refreshChannelNpcs();
+                  void refreshOfficeNpcs();
+                }}
+                embedded
+              />
+            )}
+
+            {channelId && (
+              <NpcHireModal
+                channelId={channelId}
+                isOpen={showHireModal}
+                onClose={() => {
+                  setShowHireModal(false);
+                  setEditingNpc(null);
+                  EventBus.emit("dialog:active", false);
+                }}
+                onPlaceOnMap={(npcData) => {
+                  setPendingNpc(npcData);
+                  setShowHireModal(false);
+                  setPlacementMode(true);
+                  EventBus.emit("placement-mode-start", npcData.appearance);
+                }}
+                onSaveEdit={handleSaveNpcEdit}
+                editingNpc={editingNpc}
+                currentNpcCount={channelNpcs.length}
+                hasGateway={channel?.hasGateway || false}
+                gatewayProvider={channel?.gatewayConfig?.provider || "openclaw"}
+              />
+            )}
+          </>
         )}
       </div>
     );
@@ -1863,7 +1958,7 @@ function GamePageInner() {
             socket={socket}
             isOpen={Boolean(managedNpc)}
             onClose={handleCloseManagedNpc}
-            onOpenChat={(npcId, npcName) => postNpcDockAction("starken-os:npc-dock-talk", { npcId, npcName })}
+            onOpenChat={handleSelectNpc}
             onEditNpc={(npcId) => EventBus.emit("npc:edit", { npcId })}
             onResetChat={(npcId) => handleResetNpcChatById(npcId)}
             onNpcUpdated={() => {

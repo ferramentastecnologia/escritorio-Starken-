@@ -1511,8 +1511,14 @@ body.sidebar-collapsed #mainSidebarCollapseIcon { transform: rotate(180deg); }
 
 /* ===== GLOBAL AGENT DOCK ===== */
 :root {
-  --global-agent-dock-expanded: 260px;
+  --global-agent-panel-width: 260px;
+  --global-agent-chat-width: 340px;
+  --global-agent-dock-expanded: var(--global-agent-panel-width);
   --global-agent-dock-collapsed: 58px;
+  --global-agent-dock-space: var(--global-agent-dock-expanded);
+}
+body.agent-dock-chat-open:not(.agent-dock-collapsed) {
+  --global-agent-dock-expanded: calc(var(--global-agent-panel-width) + var(--global-agent-chat-width));
   --global-agent-dock-space: var(--global-agent-dock-expanded);
 }
 body.agent-dock-collapsed { --global-agent-dock-space: var(--global-agent-dock-collapsed); }
@@ -42131,7 +42137,7 @@ function npcRenderCards() {
 
 const GLOBAL_AGENT_DOCK_KEY = 'starken_global_agent_dock_collapsed_v1';
 const MAIN_SIDEBAR_COLLAPSED_KEY = 'starken_main_sidebar_collapsed_v1';
-const GLOBAL_AGENT_DOCK_VERSION = '20260517-real-office-dock-v2';
+const GLOBAL_AGENT_DOCK_VERSION = '20260523-real-dock-chat-v1';
 
 function mainSidebarApplyCollapsed() {
   var collapsed = false;
@@ -42173,6 +42179,7 @@ function globalAgentDockApplyCollapsed() {
   var collapsed = false;
   try { collapsed = localStorage.getItem(GLOBAL_AGENT_DOCK_KEY) === '1'; } catch(e) {}
   document.body.classList.toggle('agent-dock-collapsed', collapsed);
+  if (collapsed) document.body.classList.remove('agent-dock-chat-open');
   var icons = document.querySelectorAll('[data-global-agent-toggle-icon]');
   icons.forEach(function(icon) { icon.textContent = collapsed ? 'chevron_left' : 'chevron_right'; });
 }
@@ -42188,6 +42195,7 @@ function globalAgentDockRefresh() {
   globalAgentDockApplyCollapsed();
   var visible = globalAgentDockIsAvailable();
   document.body.classList.toggle('agent-dock-visible', visible);
+  if (!visible) document.body.classList.remove('agent-dock-chat-open');
   if (visible) globalAgentDockEnsureFrame(false);
 }
 
@@ -42266,6 +42274,11 @@ function globalAgentDockOpenChat(npcId, npcName) {
 window.addEventListener('message', function(event) {
   if (event.origin !== window.location.origin) return;
   var data = event.data || {};
+  if (data.type === 'starken-os:npc-dock-chat-state') {
+    var chatOpen = Boolean(data.open) && !document.body.classList.contains('agent-dock-collapsed');
+    document.body.classList.toggle('agent-dock-chat-open', chatOpen);
+    return;
+  }
   if (data.type === 'starken-os:npc-dock-manage') globalAgentDockOpenNpc(data.npcId, 'resumo');
   if (data.type === 'starken-os:npc-dock-talk') globalAgentDockOpenChat(data.npcId, data.npcName);
   if (data.type === 'starken-os:npc-dock-edit') globalAgentDockOpenNpc(data.npcId, 'config');
