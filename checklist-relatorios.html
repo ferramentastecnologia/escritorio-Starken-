@@ -1511,14 +1511,8 @@ body.sidebar-collapsed #mainSidebarCollapseIcon { transform: rotate(180deg); }
 
 /* ===== GLOBAL AGENT DOCK ===== */
 :root {
-  --global-agent-panel-width: 260px;
-  --global-agent-chat-width: 340px;
-  --global-agent-dock-expanded: var(--global-agent-panel-width);
+  --global-agent-dock-expanded: 260px;
   --global-agent-dock-collapsed: 58px;
-  --global-agent-dock-space: var(--global-agent-dock-expanded);
-}
-body.agent-dock-chat-open:not(.agent-dock-collapsed) {
-  --global-agent-dock-expanded: calc(var(--global-agent-panel-width) + var(--global-agent-chat-width));
   --global-agent-dock-space: var(--global-agent-dock-expanded);
 }
 body.agent-dock-collapsed { --global-agent-dock-space: var(--global-agent-dock-collapsed); }
@@ -7274,7 +7268,7 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
 .npc-hero h2{margin:0;color:var(--text);font-size:1.55rem;line-height:1.05}
 .npc-hero p{margin:9px 0 0;color:var(--text-secondary);max-width:820px;line-height:1.45}
 .npc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
-.npc-card{border:1px solid var(--border);border-radius:20px;background:var(--card);padding:20px;box-shadow:var(--shadow);cursor:pointer;transition:.18s ease;height:320px;min-height:320px;display:flex;flex-direction:column;gap:12px;text-align:center;align-items:center;overflow:hidden}
+.npc-card{border:1px solid var(--border);border-radius:20px;background:var(--card);padding:20px;box-shadow:var(--shadow);cursor:pointer;transition:.18s ease;min-height:258px;display:flex;flex-direction:column;gap:14px;text-align:center;align-items:center}
 .npc-card:hover,.npc-card.active{border-color:rgba(70,238,205,.44);transform:translateY(-1px);box-shadow:0 18px 44px rgba(0,0,0,.2)}
 .npc-card-top{display:grid;justify-items:center;gap:12px;width:100%}
 .npc-avatar{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,#14283a,#46eecd);display:grid;place-items:center;color:#071313;font-size:1.3rem;font-weight:950;overflow:hidden;border:1px solid rgba(255,255,255,.08);flex-shrink:0;position:relative}
@@ -7288,10 +7282,8 @@ select.ch-field-value { appearance: auto; cursor: pointer; }
 .npc-name{font-size:1.05rem;color:var(--text);font-weight:950;line-height:1.15}
 .npc-role{font-size:.82rem;color:var(--text-secondary);margin-top:5px;line-height:1.25}
 .npc-pill-row{display:flex;flex-wrap:wrap;gap:6px}
-.npc-card-tags{justify-content:center;min-height:58px;max-height:58px;overflow:hidden;align-content:flex-start}
-.npc-card-actions{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;min-height:28px}
 .npc-pill{border:1px solid rgba(70,238,205,.25);background:rgba(70,238,205,.08);color:#46eecd;border-radius:999px;padding:4px 8px;font-size:.67rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
-.npc-card small{color:var(--text-muted);line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-height:4.1em}
+.npc-card small{color:var(--text-muted);line-height:1.4}
 .npc-workbench{display:grid;grid-template-columns:1fr;gap:16px}
 .npc-panel{border:1px solid var(--border);border-radius:18px;background:var(--card);padding:16px;box-shadow:var(--shadow)}
 .npc-panel h3{margin:0 0 12px;color:var(--text);font-size:1rem;display:flex;align-items:center;gap:8px}
@@ -18475,6 +18467,7 @@ const GP_USERS = [
 ];
 
 const GP_LOCAL_LOGIN_HASHES = {
+  Juan: 'a636c53e19a34ad12a84c461e3320eb8740e7b00606b62e3faf6ab4baa5ee7fc',
   Victor: '0510149723510244f6392b38e1a2437ce410eb7bc53ca2f9da41e36b36325ce6',
   Will: '78b6c12e0f1397d8770e6aefbea9f23845182d715fc1d2ec3b4acb4aa1a14192'
 };
@@ -27691,6 +27684,7 @@ async function ctHandleFileUpload(files, category) {
 
   var SUPABASE_URL = 'https://cpwpxckmuecejtkcobre.supabase.co';
   var SUPABASE_ANON = SUPABASE_KEY; // Use the global SUPABASE_KEY constant
+  var CT_SUPABASE_DIRECT_LIMIT = 48 * 1024 * 1024;
 
   for (const file of files) {
     // Show progress bar
@@ -27731,7 +27725,36 @@ async function ctHandleFileUpload(files, category) {
 
       updateProgress(5, 'Preparando upload de ' + sizeMB + ' MB...');
 
-      {
+      if (file.size > CT_SUPABASE_DIRECT_LIMIT && /^video\//i.test(file.type || '')) {
+        updateProgress(5, 'Enviando vídeo grande pela VPS...');
+        await new Promise(function(resolve, reject) {
+          var xhr = new XMLHttpRequest();
+          var uploadUrl = ctApiBase() + '/api/content/upload-large?client=' + encodeURIComponent(ctCurrentClient || 'geral') + '&filename=' + encodeURIComponent(file.name);
+          xhr.open('POST', uploadUrl, true);
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+          xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
+          xhr.setRequestHeader('X-Client', encodeURIComponent(ctCurrentClient || 'geral'));
+          xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+              var pct = Math.round(e.loaded / e.total * 100);
+              updateProgress(pct, pct + '% · ' + (e.loaded/1024/1024).toFixed(1) + '/' + sizeMB + ' MB');
+            }
+          };
+          xhr.onload = function() {
+            var data = {};
+            try { data = JSON.parse(xhr.responseText || '{}'); } catch(e) {}
+            if (xhr.status >= 200 && xhr.status < 300 && data.publicUrl) {
+              publicUrl = data.publicUrl;
+              updateProgress(100, '<span class="mso mso-fill">check_circle</span> Upload concluído!');
+              resolve();
+            } else {
+              reject(new Error((data && data.message) || ('Upload falhou: HTTP ' + xhr.status)));
+            }
+          };
+          xhr.onerror = function() { reject(new Error('Erro de rede')); };
+          xhr.send(file);
+        });
+      } else {
         // Always use XMLHttpRequest for real-time progress percentage — works for ALL file sizes
         var uploadUrl = SUPABASE_URL + '/storage/v1/object/client-hub-materials/' + storagePath;
         await new Promise(function(resolve, reject) {
@@ -41699,8 +41722,9 @@ function npcBuildContext(scope, baseCtx) {
 
 function npcSwitchDrawerContext(scope) {
   _npcState.context = npcBuildContext(scope, _npcState.context);
+  var npc = npcProfile(_npcState.activeNpc);
   var sub = document.getElementById('npcDrawerSub');
-  if (sub) sub.textContent = npcContextSnapshot(_npcState.context);
+  if (sub) sub.textContent = npcContextSnapshot(_npcState.context) + ' ' + (npc.seed || '');
   npcRenderDrawerContext();
   npcRenderChat();
   npcHydrateAvatars();
@@ -41714,146 +41738,32 @@ function npcNormalizeMatch(v) {
   return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-var _npcOfficeRosterRows = _npcOfficeRosterRows || [];
-var _npcOfficeRosterByAnyId = _npcOfficeRosterByAnyId || {};
-
-function npcOfficeKey(v) {
-  return npcNormalizeMatch(v).replace(/\s+/g, '-');
-}
-
-function npcOfficeInitials(name) {
-  var clean = String(name || 'NPC').replace(/[-–].*$/, ' ').trim().split(/\s+/).filter(Boolean);
-  return (clean[0] || 'N').charAt(0).toUpperCase() + (clean[1] || clean[0] || 'P').charAt(0).toUpperCase();
-}
-
-function npcOfficeColor(seed) {
-  var text = String(seed || 'npc');
-  var hash = 0;
-  for (var i = 0; i < text.length; i++) hash = ((hash << 5) - hash) + text.charCodeAt(i);
-  var palette = ['#5b8fd7','#45d6bc','#c55b99','#2da8d8','#d69b28','#2ca75a','#8d6dd1','#30afa2','#d25f76','#c46d2a','#78b43a','#9b67c8'];
-  return palette[Math.abs(hash) % palette.length];
-}
-
-function npcOfficeText(value, fallback) {
-  var text = String(value || '').trim();
-  return text || fallback || '';
-}
-
-function npcOfficeFindProfileByAnyId(value) {
-  if (!value || typeof NPC_PROFILES === 'undefined') return null;
-  var key = String(value);
-  if (_npcOfficeRosterByAnyId[key]) return _npcOfficeRosterByAnyId[key];
-  return (NPC_PROFILES || []).find(function(profile) {
-    return profile.id === key || profile.officeNpcId === key || profile.agentId === key || profile.officeName === key || profile.name === key;
-  }) || null;
-}
-
-function npcOfficeIndexProfile(profile, row) {
-  if (!profile) return;
-  [profile.id, profile.officeNpcId, profile.agentId, profile.officeName, profile.name, row && row.id, row && row.agentId, row && row.name].forEach(function(value) {
-    if (value) _npcOfficeRosterByAnyId[String(value)] = profile;
-  });
-}
-
-function npcOfficeBuildProfile(row) {
-  var cfg = row || {};
-  var agentId = cfg.agentId || cfg.agent_id || '';
-  var name = npcOfficeText(cfg.name, agentId || 'NPC do Escritório');
-  var identity = npcOfficeText(cfg.identity, '');
-  var soul = npcOfficeText(cfg.soul, '');
-  var role = npcOfficeText(cfg.role || cfg.function || (identity.split('\n')[0] || ''), 'NPC real do Escritório Virtual');
-  var profileId = agentId || ('office-' + cfg.id);
-  var initials = npcOfficeInitials(name);
-  var seed = npcOfficeText(identity || soul, role);
-  return {
-    id: profileId,
-    name: name,
-    initials: initials,
-    role: role,
-    seed: seed,
-    color: npcOfficeColor(profileId + name),
-    runtime: cfg.runtimeProvider ? String(cfg.runtimeProvider).replace(/^./, function(c){ return c.toUpperCase(); }) : 'Codex',
-    model: cfg.model || 'provider-default',
-    officeNpcId: cfg.id || null,
-    officeChannelId: cfg.channelId || cfg.channel_id || NPC_OFFICE_CHANNEL_ID,
-    officeName: name,
-    agentId: agentId || profileId,
-    appearance: cfg.appearance || null,
-    identity: identity,
-    soul: soul,
-    totalTokens: cfg.totalTokens || cfg.total_tokens || 0,
-    reportsToId: cfg.reportsToId || cfg.reports_to_id || null,
-    domains: Array.isArray(cfg.domains) && cfg.domains.length ? cfg.domains : ['Escritório', 'Operação'],
-    menus: Array.isArray(cfg.menus) && cfg.menus.length ? cfg.menus : ['Escritório Virtual', 'NPCs'],
-    actions: Array.isArray(cfg.actions) && cfg.actions.length ? cfg.actions : ['Abrir chat', 'Gerir NPC', 'Editar NPC', 'Analisar contexto'],
-    tools: Array.isArray(cfg.tools) && cfg.tools.length ? cfg.tools : ['Chat', 'Memória', 'Tarefas', 'Relatórios'],
-    live: true
-  };
-}
-
-function npcOfficeFindExisting(row) {
-  if (!row || typeof NPC_PROFILES === 'undefined') return null;
-  var byAny = npcOfficeFindProfileByAnyId(row.id) || npcOfficeFindProfileByAnyId(row.agentId) || npcOfficeFindProfileByAnyId(row.name);
-  if (byAny) return byAny;
-  var rowFirst = npcNormalizeMatch(row.name).split(' ')[0];
-  return (NPC_PROFILES || []).find(function(profile) {
-    return rowFirst && npcNormalizeMatch(profile.name).split(' ')[0] === rowFirst;
-  }) || null;
-}
-
-function npcUpsertOfficeProfile(row) {
-  if (!row || typeof NPC_PROFILES === 'undefined') return null;
-  var profile = npcOfficeFindExisting(row);
-  var built = npcOfficeBuildProfile(row);
-  if (profile) {
-    Object.keys(built).forEach(function(key) {
-      if (built[key] !== undefined && built[key] !== null && built[key] !== '') profile[key] = built[key];
-    });
-  } else {
-    profile = built;
-    NPC_PROFILES.push(profile);
-  }
-  npcOfficeIndexProfile(profile, row);
-  return profile;
-}
-
-function npcOfficeRememberRows(rows) {
-  _npcOfficeRosterRows = rows || [];
-  _npcOfficeRosterByAnyId = {};
-  _npcOfficeRosterRows.forEach(function(row) { npcUpsertOfficeProfile(row); });
-}
-
-function npcOfficeFetchRoomIds() {
-  var root = (typeof NPC_OFFICE_CHANNEL_ID !== 'undefined' && NPC_OFFICE_CHANNEL_ID) ? NPC_OFFICE_CHANNEL_ID : '24219fff-5008-465b-994d-077db53e554a';
-  var strategic = 'bd4766f5-1cbe-4cdf-bc0a-4bf6541660ca';
-  var ids = [root, strategic];
-  return fetch('/api/channels/office-rooms?channelId=' + encodeURIComponent(root))
-    .then(function(res){ return res.ok ? res.json() : null; })
-    .then(function(data) {
-      var rooms = data && Array.isArray(data.rooms) ? data.rooms : [];
-      rooms.forEach(function(room) {
-        var id = room.id || room.channelId || room.channel_id;
-        if (id && ids.indexOf(id) === -1) ids.push(id);
-      });
-      return ids;
-    })
-    .catch(function(){ return ids; });
-}
-
 function npcLoadOfficeRoster(force) {
   if (_npcOfficeRosterLoaded && !force) return Promise.resolve();
   if (_npcOfficeRosterLoading && _npcOfficeRosterPromise) return _npcOfficeRosterPromise;
   _npcOfficeRosterLoading = true;
-  _npcOfficeRosterPromise = npcOfficeFetchRoomIds()
-    .then(function(channelIds) {
-      var unique = channelIds.filter(function(id, index, arr){ return id && arr.indexOf(id) === index; });
-      return fetch('/api/npcs?channelIds=' + encodeURIComponent(unique.join(',')));
-    })
+  _npcOfficeRosterPromise = fetch('/api/npcs?channelId=' + encodeURIComponent(NPC_OFFICE_CHANNEL_ID))
     .then(function(res){ return res.ok ? res.json() : null; })
     .then(function(data){
       var rows = data && Array.isArray(data.npcs) ? data.npcs : [];
       if (!rows.length) return;
-      npcOfficeRememberRows(rows);
+      rows.forEach(function(row) {
+        var byAgent = NPC_PROFILES.find(function(p){ return p.agentId && row.agentId && p.agentId === row.agentId; });
+        var byOffice = NPC_PROFILES.find(function(p){ return p.officeNpcId && p.officeNpcId === row.id; });
+        var rowName = npcNormalizeMatch(row.name).split(' ')[0];
+        var byName = NPC_PROFILES.find(function(p){ return npcNormalizeMatch(p.name).split(' ')[0] === rowName; });
+        var profile = byAgent || byOffice || byName;
+        if (!profile) return;
+        profile.officeNpcId = row.id || profile.officeNpcId;
+        profile.officeChannelId = row.channelId || NPC_OFFICE_CHANNEL_ID;
+        profile.officeName = row.name || profile.officeName;
+        profile.appearance = row.appearance || profile.appearance;
+        profile.identity = row.identity || profile.identity;
+        profile.soul = row.soul || profile.soul;
+        profile.runtime = row.runtimeProvider ? String(row.runtimeProvider).replace(/^./, function(c){ return c.toUpperCase(); }) : profile.runtime;
+        profile.model = row.model || profile.model;
+        profile.reportsToId = row.reportsToId || profile.reportsToId;
+      });
       _npcOfficeRosterLoaded = true;
       npcRenderDashboard();
       npcRenderCards();
@@ -42112,12 +42022,6 @@ window.addEventListener('message', function(event) {
   }
 });
 
-function npcCardSummary(npc) {
-  var text = (npc && (npc.role || npc.description)) || 'NPC real do Escritório Virtual conectado ao Starken OS.';
-  text = String(text).replace(/\s+/g, ' ').trim();
-  return text.length > 150 ? text.slice(0, 147).trim() + '...' : text;
-}
-
 function npcRenderCards() {
   var el = document.getElementById('npcCards');
   if (!el) return;
@@ -42125,9 +42029,9 @@ function npcRenderCards() {
     return '<button class="npc-card ' + (_npcState.activeNpc === n.id ? 'active' : '') + '" onclick="npcOpenFromCard(\'' + npcEsc(n.id) + '\')">' +
       '<div class="npc-card-top">' + npcAvatarHtml(n, 'card') +
       '<div><div class="npc-name">' + npcEsc(n.name) + '</div><div class="npc-role">' + npcEsc(n.role) + '</div></div></div>' +
-      '<div class="npc-pill-row npc-card-tags">' + n.domains.slice(0,3).map(function(d){ return '<span class="npc-pill">' + npcEsc(d) + '</span>'; }).join('') + '</div>' +
-      '<small>' + npcEsc(npcCardSummary(n)) + '</small>' +
-      '<div class="npc-card-actions"><span class="npc-pill">Escritório</span><span class="npc-pill">' + npcEsc(n.tools.length) + ' ações</span></div>' +
+      '<div class="npc-pill-row" style="justify-content:center">' + n.domains.slice(0,3).map(function(d){ return '<span class="npc-pill">' + npcEsc(d) + '</span>'; }).join('') + '</div>' +
+      '<small>' + npcEsc(n.seed || 'NPC real do Escritório Virtual conectado ao Starken OS.') + '</small>' +
+      '<div style="margin-top:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><span class="npc-pill">Escritório</span><span class="npc-pill">' + npcEsc(n.tools.length) + ' ações</span></div>' +
     '</button>';
   }).join('');
   setTimeout(npcHydrateAvatars, 0);
@@ -42137,7 +42041,7 @@ function npcRenderCards() {
 
 const GLOBAL_AGENT_DOCK_KEY = 'starken_global_agent_dock_collapsed_v1';
 const MAIN_SIDEBAR_COLLAPSED_KEY = 'starken_main_sidebar_collapsed_v1';
-const GLOBAL_AGENT_DOCK_VERSION = '20260523-real-dock-chat-v1';
+const GLOBAL_AGENT_DOCK_VERSION = '20260517-real-office-dock-v2';
 
 function mainSidebarApplyCollapsed() {
   var collapsed = false;
@@ -42179,7 +42083,6 @@ function globalAgentDockApplyCollapsed() {
   var collapsed = false;
   try { collapsed = localStorage.getItem(GLOBAL_AGENT_DOCK_KEY) === '1'; } catch(e) {}
   document.body.classList.toggle('agent-dock-collapsed', collapsed);
-  if (collapsed) document.body.classList.remove('agent-dock-chat-open');
   var icons = document.querySelectorAll('[data-global-agent-toggle-icon]');
   icons.forEach(function(icon) { icon.textContent = collapsed ? 'chevron_left' : 'chevron_right'; });
 }
@@ -42195,7 +42098,6 @@ function globalAgentDockRefresh() {
   globalAgentDockApplyCollapsed();
   var visible = globalAgentDockIsAvailable();
   document.body.classList.toggle('agent-dock-visible', visible);
-  if (!visible) document.body.classList.remove('agent-dock-chat-open');
   if (visible) globalAgentDockEnsureFrame(false);
 }
 
@@ -42205,15 +42107,10 @@ function globalAgentDockRender() {
 
 function npcProfileFromDockId(npcId) {
   if (!npcId || typeof NPC_PROFILES === 'undefined') return null;
-  if (typeof npcOfficeFindProfileByAnyId === 'function') {
-    var resolved = npcOfficeFindProfileByAnyId(npcId);
-    if (resolved) return resolved;
-  }
   return (NPC_PROFILES || []).find(function(n) {
-    return n.id === npcId || n.officeNpcId === npcId || n.agentId === npcId || n.officeName === npcId || n.name === npcId;
+    return n.id === npcId || n.officeNpcId === npcId || n.agentId === npcId;
   }) || null;
 }
-
 
 function globalAgentDockOpenNpc(npcId, tab, npcName) {
   var localNpc = npcProfileFromDockId(npcId);
@@ -42227,17 +42124,8 @@ function globalAgentDockOpenNpc(npcId, tab, npcName) {
       if (refreshed) {
         npcOpenCommandModal(refreshed.id, tab || 'resumo');
       } else {
-        var fallback = (typeof npcUpsertOfficeProfile === 'function') ? npcUpsertOfficeProfile({
-          id: npcId,
-          name: npcName || 'NPC do Escritório',
-          channelId: (typeof NPC_OFFICE_CHANNEL_ID !== 'undefined' && NPC_OFFICE_CHANNEL_ID) ? NPC_OFFICE_CHANNEL_ID : '24219fff-5008-465b-994d-077db53e554a',
-          agentId: npcId
-        }) : null;
-        if (fallback) {
-          npcOpenCommandModal(fallback.id, tab || 'resumo');
-        } else if (typeof showToast === 'function') {
-          showToast('Não encontrei este NPC no Escritório Virtual.', 'warning');
-        }
+        var channel = (typeof NPC_OFFICE_CHANNEL_ID !== 'undefined' && NPC_OFFICE_CHANNEL_ID) ? NPC_OFFICE_CHANNEL_ID : '24219fff-5008-465b-994d-077db53e554a';
+        window.open('/game?embedHost=starken-os&npcCommandOnly=1&channelId=' + encodeURIComponent(channel) + '&npcCommandId=' + encodeURIComponent(npcId || '') + '&npcName=' + encodeURIComponent(npcName || ''), '_blank');
       }
     });
   }
@@ -42256,16 +42144,8 @@ function globalAgentDockOpenChat(npcId, npcName) {
   if (typeof npcLoadOfficeRoster === 'function') {
     npcLoadOfficeRoster(true).finally(function() {
       var refreshed = npcProfileFromDockId(npcId);
-      if (!openLocalDrawer(refreshed)) {
-        var fallback = (typeof npcUpsertOfficeProfile === 'function') ? npcUpsertOfficeProfile({
-          id: npcId,
-          name: npcName || 'NPC do Escritório',
-          channelId: (typeof NPC_OFFICE_CHANNEL_ID !== 'undefined' && NPC_OFFICE_CHANNEL_ID) ? NPC_OFFICE_CHANNEL_ID : '24219fff-5008-465b-994d-077db53e554a',
-          agentId: npcId
-        }) : null;
-        if (!openLocalDrawer(fallback) && typeof showToast === 'function') {
-          showToast('Não encontrei este NPC no Escritório Virtual.', 'warning');
-        }
+      if (!openLocalDrawer(refreshed) && typeof showToast === 'function') {
+        showToast('Não encontrei o vínculo deste NPC para abrir o chat. Abra a central e tente novamente.', 'warning');
       }
     });
   }
@@ -42274,11 +42154,6 @@ function globalAgentDockOpenChat(npcId, npcName) {
 window.addEventListener('message', function(event) {
   if (event.origin !== window.location.origin) return;
   var data = event.data || {};
-  if (data.type === 'starken-os:npc-dock-chat-state') {
-    var chatOpen = Boolean(data.open) && !document.body.classList.contains('agent-dock-collapsed');
-    document.body.classList.toggle('agent-dock-chat-open', chatOpen);
-    return;
-  }
   if (data.type === 'starken-os:npc-dock-manage') globalAgentDockOpenNpc(data.npcId, 'resumo');
   if (data.type === 'starken-os:npc-dock-talk') globalAgentDockOpenChat(data.npcId, data.npcName);
   if (data.type === 'starken-os:npc-dock-edit') globalAgentDockOpenNpc(data.npcId, 'config');
@@ -42291,7 +42166,7 @@ window.addEventListener('message', function(event) {
 function npcMemoryPreviewHtml(npc) {
   var memories = npcGetMemories(npc.id, { scope:'global', section:'npc-center' });
   var globalRows = memories.global.slice(0, 5);
-  var seedHtml = '<div class="npc-list-item"><strong>Memória base do Escritório</strong>Instruções completas, persona e arquivos sincronizados ficam disponíveis apenas na aba Configuração e no Command Center real do Escritório Virtual.</div>';
+  var seedHtml = '<div class="npc-list-item"><strong>Memória base do Escritório</strong>' + npcEsc(npc.seed || '') + '</div>';
   return seedHtml + (globalRows.length ? globalRows.map(function(m) {
     return '<div class="npc-list-item"><strong>' + new Date(m.at).toLocaleString('pt-BR') + '</strong>' + npcEsc(m.text) + '</div>';
   }).join('') : '<div class="npc-empty"><span class="mso">memory</span><br>Nenhuma memória manual salva neste navegador para este NPC.<br>A base real fica em <strong>agent-memory/' + npcEsc(npc.memorySlug) + '</strong>.</div>');
@@ -42379,7 +42254,7 @@ function npcCommandBodyHtml(npc) {
   if (tab === 'config') {
     return '<div class="npc-panel"><h3><span class="mso">settings</span> Configuração do NPC</h3><div class="npc-config-grid"><label>Nome do NPC<input id="npcCfgName" value="' + npcEsc(npc.name) + '"></label><label>Runtime<input value="' + npcEsc(npc.runtime || 'Codex') + '" disabled></label><label>Função<input id="npcCfgRole" value="' + npcEsc(npc.role) + '"></label><label>Tom<input id="npcCfgTone" value="' + npcEsc(npc.tone || '') + '"></label><label>Persona / memória base<textarea id="npcCfgSeed">' + npcEsc(npc.identity || npc.seed || '') + '</textarea></label></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="npc-btn primary" onclick="npcSaveLocalConfig()"><span class="mso">save</span> Salvar rascunho local</button><button class="npc-btn" onclick="npcOpenOfficeRoom(\'' + npcEsc(npc.id) + '\')"><span class="mso">open_in_new</span> Abrir Escritório Virtual</button></div></div>';
   }
-  return npcCommandMetricsHtml(npc) + '<div class="npc-command-layout"><div class="npc-panel"><h3><span class="mso">badge</span> Identidade operacional</h3><div class="npc-mini-grid"><div class="npc-mini-card"><strong>Função</strong>' + npcEsc(npc.role) + '</div><div class="npc-mini-card"><strong>Soul / tom</strong>' + npcEsc(npc.tone || 'Direto e útil') + '</div><div class="npc-mini-card"><strong>Base real</strong>' + npcEsc('agentId: ' + npc.agentId) + '</div><div class="npc-mini-card"><strong>Memória</strong>' + npcEsc('agent-memory/' + npc.memorySlug) + '</div></div><div style="margin-top:14px" class="npc-list-item"><strong>Como ele trabalha</strong>' + npcEsc(npc.role || 'NPC operacional conectado ao Escritório Virtual.') + '<br><small>As instruções completas aparecem somente em Configuração.</small></div></div><div class="npc-panel"><h3><span class="mso">chat</span> Conversa recente</h3>' + npcRecentConversationHtml(npc) + '</div></div><div class="npc-command-layout"><div class="npc-panel"><h3><span class="mso">assignment</span> Últimas tarefas</h3><div class="npc-empty"><strong>Nenhuma tarefa vinculada nesta tela</strong><br>Quando uma task for atribuída ao NPC, ela aparece aqui por cliente e por menu.</div></div><div class="npc-panel"><h3><span class="mso">groups</span> Memória de reunião</h3><div class="npc-empty"><strong>Sem reuniões relevantes</strong><br>Quando este NPC participar de reunião, decisões e próximos passos aparecem aqui.</div></div></div>';
+  return npcCommandMetricsHtml(npc) + '<div class="npc-command-layout"><div class="npc-panel"><h3><span class="mso">badge</span> Identidade operacional</h3><div class="npc-mini-grid"><div class="npc-mini-card"><strong>Função</strong>' + npcEsc(npc.role) + '</div><div class="npc-mini-card"><strong>Soul / tom</strong>' + npcEsc(npc.tone || 'Direto e útil') + '</div><div class="npc-mini-card"><strong>Base real</strong>' + npcEsc('agentId: ' + npc.agentId) + '</div><div class="npc-mini-card"><strong>Memória</strong>' + npcEsc('agent-memory/' + npc.memorySlug) + '</div></div><div style="margin-top:14px" class="npc-list-item"><strong>Como ele trabalha</strong>' + npcEsc(npc.seed || '') + '</div></div><div class="npc-panel"><h3><span class="mso">chat</span> Conversa recente</h3>' + npcRecentConversationHtml(npc) + '</div></div><div class="npc-command-layout"><div class="npc-panel"><h3><span class="mso">assignment</span> Últimas tarefas</h3><div class="npc-empty"><strong>Nenhuma tarefa vinculada nesta tela</strong><br>Quando uma task for atribuída ao NPC, ela aparece aqui por cliente e por menu.</div></div><div class="npc-panel"><h3><span class="mso">groups</span> Memória de reunião</h3><div class="npc-empty"><strong>Sem reuniões relevantes</strong><br>Quando este NPC participar de reunião, decisões e próximos passos aparecem aqui.</div></div></div>';
 }
 
 function npcRenderDetail(npcId) {
@@ -42446,7 +42321,7 @@ function npcOpenDrawer(npcId, ctx) {
   if (drawerAvatarEl) drawerAvatarEl.outerHTML = npcAvatarHtml(npc, 'drawer', 'npcDrawerAvatar');
   document.getElementById('npcDrawerName').textContent = npc.name;
   document.getElementById('npcDrawerRole').textContent = npc.role;
-  document.getElementById('npcDrawerSub').textContent = npcContextSnapshot(_npcState.context);
+  document.getElementById('npcDrawerSub').textContent = npcContextSnapshot(_npcState.context) + ' ' + (npc.seed || '');
   npcRenderDrawerContext();
   npcRenderChat();
   backdrop.classList.add('open');
@@ -42490,7 +42365,7 @@ function npcRenderDrawerContext() {
   var memories = npcGetMemories(npcId, ctx);
   box.innerHTML = '<span class="npc-pill">' + npcEsc(npcContextLabel(ctx)) + '</span><span class="npc-pill">' + npcEsc(ctx.section || 'geral') + '</span><span class="npc-pill">' + npcEsc(memories.bucket) + '</span><span class="npc-pill">' + npcEsc(npc.agentId) + '</span>';
   var total = memories.global.length + memories.scoped.length;
-  mem.innerHTML = (total
+  mem.innerHTML = (npc.seed ? '<strong>Base:</strong> ' + npcEsc(npc.seed) + '<br>' : '') + (total
     ? 'Memória manual carregada: ' + memories.global.length + ' global(is) + ' + memories.scoped.length + ' deste contexto.'
     : 'Sem memória manual salva ainda neste contexto. Use "lembrar: ..." para registrar aprendizado.');
 }
