@@ -24085,9 +24085,10 @@ const CT_USERS = [
   { name: 'Victor', color: '#8b5cf6' },
   { name: 'Emily',    color: '#f59e0b' },
   { name: 'Leonardo', color: '#10b981' },
-  { name: 'Dante',    color: '#f97316' },
-  { name: 'Will',     color: '#14b8a6' },
+  { name: 'Dante',    color: '#f97316', disabled: true },
+  { name: 'Will',     color: '#14b8a6', disabled: true },
 ];
+const CT_USERS_ACTIVE = CT_USERS.filter(function(u){ return !u.disabled; });
 
 function ctRenderAssigneeCell(assigneeStr, taskId) {
   var names = (assigneeStr || '').split(',').map(function(n){ return n.trim(); }).filter(Boolean);
@@ -26092,7 +26093,7 @@ function ctShowAssigneeDropdown(event, taskId) {
   };
   dropdown.appendChild(unassign);
 
-  CT_USERS.forEach(function(u) {
+  CT_USERS_ACTIVE.forEach(function(u) {
     const item = document.createElement('label');
     item.className = 'ct-dropdown-item';
     item.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer';
@@ -26105,7 +26106,7 @@ function ctShowAssigneeDropdown(event, taskId) {
       e.stopPropagation();
       var newAssignees = [];
       dropdown.querySelectorAll('input[type=checkbox]').forEach(function(cb, idx) {
-        if (cb.checked) newAssignees.push(CT_USERS[idx].name);
+        if (cb.checked) newAssignees.push(CT_USERS_ACTIVE[idx].name);
       });
       var newStr = newAssignees.join(',') || null;
       if (taskId === 'modal') {
@@ -28735,7 +28736,7 @@ async function ctBulkChangeAssignee() {
   dropdown.appendChild(modeWrap);
 
   // User checkboxes
-  CT_USERS.forEach(function(u) {
+  CT_USERS_ACTIVE.forEach(function(u) {
     var item = document.createElement('label');
     item.className = 'ct-dropdown-item';
     item.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer';
@@ -28754,7 +28755,7 @@ async function ctBulkChangeAssignee() {
     e.stopPropagation();
     var selectedNames = [];
     dropdown.querySelectorAll('input[type=checkbox]').forEach(function(cb, idx) {
-      if (cb.checked) selectedNames.push(CT_USERS[idx].name);
+      if (cb.checked) selectedNames.push(CT_USERS_ACTIVE[idx].name);
     });
     if (selectedNames.length === 0 && modeState.value === 'replace') {
       // Clear assignees
