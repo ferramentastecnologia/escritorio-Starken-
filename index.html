@@ -7575,20 +7575,7 @@ body.designer-mode .mt-nexus{min-height:calc(100vh - 52px)}
       </div>
     </div>
 
-    <div class="main office-mode">
-
-      <!-- ESCRITÓRIO VIRTUAL -->
-      <div id="tab-escritorio" class="tab-content active">
-        <div class="office-embed-shell">
-          <iframe
-            id="officeEmbedFrame"
-            title="Escritório Virtual Starken"
-            src="about:blank"
-            data-office-src="/game?channelId=24219fff-5008-465b-994d-077db53e554a&characterId=e6b344b1-780d-4332-9412-59b73066e121&embedHost=starken-os&frame=clean&embedMode=starken-shell&shellFix=6&chatDock=20260517&hideNpcDock=1"
-            loading="eager"
-          ></iframe>
-        </div>
-      </div>
+    <div class="main">
 
       <!-- GESTÃO DE PROJETOS -->
       <div id="tab-gestao" class="tab-content">
@@ -9172,7 +9159,7 @@ body.designer-mode .mt-nexus{min-height:calc(100vh - 52px)}
       </div>
 
       <!-- ═══ PORTAL DO CLIENTE ═══ -->
-      <div id="tab-client-portal" class="tab-content">
+      <div id="tab-client-portal" class="tab-content active">
         <div class="cp-shell">
           <div class="cp-topbar">
             <div class="cp-brand-title">
@@ -11670,7 +11657,6 @@ function getCurrentMonthKey() {
 
 // ============ SIDEBAR MENU DATA & RENDER ============
 let SIDEBAR_MENU = [
-  { type: 'item', id: 'escritorio', label: 'Escritório Virtual', icon: '<span class="mso">business_center</span>', tab: 'escritorio' },
   { type: 'item', id: 'client-portal', label: 'Portal do Cliente', icon: '<span class="mso">dashboard_customize</span>', tab: 'client-portal' },
   { type: 'item', id: 'dashboard', label: 'Dashboard', icon: '<span class="mso">square</span>', tab: 'dashboard' },
   { type: 'item', id: 'minhas-tasks', label: 'Minhas Tasks', icon: '<span class="mso">gps_fixed</span>', tab: 'minhas-tasks' },
@@ -11694,10 +11680,6 @@ let SIDEBAR_MENU = [
     { type: 'item', id: 'clients', label: 'Clientes', icon: '<span class="mso">group</span>', tab: 'client-central' },
     { type: 'item', id: 'history', label: 'Histórico', icon: '<span class="mso">assignment</span>', tab: 'history' },
     { type: 'item', id: 'system-logs', label: 'Logs do Sistema', icon: '<span class="mso">build</span>', tab: 'system-logs' },
-  ]},
-  { type: 'category', id: 'cat-agents', label: 'NPCs', items: [
-    { type: 'item', id: 'npc-center', label: 'Central de NPCs', icon: '<span class="mso">hub</span>', tab: 'npc-center' },
-    { type: 'item', id: 'ai-squads', label: 'AI Squads', icon: '<span class="mso">smart_toy</span>', tab: 'ai-squads' },
   ]},
   { type: 'item', id: 'financeiro', label: 'Financeiro', icon: '<span class="mso">account_balance_wallet</span>', tab: 'financeiro' },
   { type: 'item', id: 'configuracoes', label: 'Configurações', icon: '<span class="mso">settings</span>', tab: 'configuracoes' },
@@ -11755,7 +11737,7 @@ function sidebarSaveOrder() {
 }
 
 function sidebarPinPrimaryItems() {
-  var pinnedIds = ['escritorio', 'client-portal', 'dashboard'];
+  var pinnedIds = ['client-portal', 'dashboard'];
   var bottomIds = ['financeiro', 'configuracoes'];
   var pinned = [];
   var rest = [];
